@@ -8,18 +8,21 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
+
+  // Quando true, mostra a tela "verifique seu e-mail" em vez do formulário
+  const [aguardandoConfirmacao, setAguardandoConfirmacao] = useState(false);
+  const [emailCadastrado, setEmailCadastrado] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setInfo(null);
 
     if (mode === "signin") {
       const { error } = await supabase.auth.signInWithPassword({
@@ -28,6 +31,7 @@ export default function LoginPage() {
       });
       if (error) {
         setError(traduzErro(error.message));
+        setLoading(false);
       } else {
         router.push("/");
         router.refresh();
@@ -36,18 +40,68 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { nome: nome.trim() },
+          emailRedirectTo:
+            typeof window !== "undefined"
+              ? `${window.location.origin}/login`
+              : undefined,
+        },
       });
       if (error) {
         setError(traduzErro(error.message));
+        setLoading(false);
       } else {
-        setInfo("Conta criada. Verifique seu e-mail se a confirmação estiver ativada, ou apenas entre agora.");
-        setMode("signin");
+        setEmailCadastrado(email);
+        setAguardandoConfirmacao(true);
+        setLoading(false);
       }
     }
-
-    setLoading(false);
   }
 
+  // ───────────────────────────────────────────
+  // Tela exibida após o cadastro, antes da confirmação
+  // ───────────────────────────────────────────
+  if (aguardandoConfirmacao) {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="mb-5 flex justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-dim">
+              <span className="text-2xl">✉️</span>
+            </div>
+          </div>
+          <h1 className="font-display text-xl font-bold text-ink">
+            Confirme seu e-mail
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            Enviamos um link de confirmação para
+          </p>
+          <p className="mt-1 text-sm font-semibold text-accent">
+            {emailCadastrado}
+          </p>
+          <p className="mt-4 text-sm text-ink-muted">
+            Clique no link recebido para ativar sua conta. Se não encontrar,
+            confira a caixa de spam.
+          </p>
+
+          <button
+            onClick={() => {
+              setAguardandoConfirmacao(false);
+              setMode("signin");
+            }}
+            className="mt-6 text-sm font-medium text-ink-muted underline hover:text-ink"
+          >
+            Voltar para o login
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // ───────────────────────────────────────────
+  // Tela de login / cadastro
+  // ───────────────────────────────────────────
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -87,6 +141,23 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {mode === "signup" && (
+              <div>
+                <label htmlFor="nome" className="mb-1.5 block text-sm text-ink-muted">
+                  Nome
+                </label>
+                <input
+                  id="nome"
+                  type="text"
+                  required
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                  placeholder="Seu nome"
+                />
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="mb-1.5 block text-sm text-ink-muted">
                 E-mail
@@ -123,11 +194,6 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
-            {info && (
-              <p className="rounded-lg bg-accent-dim px-3 py-2 text-sm text-accent">
-                {info}
-              </p>
-            )}
 
             <button
               type="submit"
@@ -145,6 +211,7 @@ export default function LoginPage() {
 
 function traduzErro(msg: string): string {
   if (msg.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
+  if (msg.includes("Email not confirmed")) return "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.";
   if (msg.includes("User already registered")) return "Já existe uma conta com este e-mail.";
   if (msg.includes("Password should be")) return "A senha precisa ter pelo menos 6 caracteres.";
   return msg;
