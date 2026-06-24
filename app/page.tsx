@@ -32,7 +32,10 @@ export default function DashboardPage() {
   const carregar = useCallback(async () => {
     setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
-    if (userData.user?.email) {
+    const nomeSalvo = userData.user?.user_metadata?.nome as string | undefined;
+    if (nomeSalvo) {
+      setNomeUsuario(nomeSalvo.split(" ")[0]);
+    } else if (userData.user?.email) {
       setNomeUsuario(userData.user.email.split("@")[0]);
     }
 
