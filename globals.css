@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  border-color: theme("colors.base.border");
+}
+
+body {
+  background-color: theme("colors.base.DEFAULT");
+  color: theme("colors.ink.DEFAULT");
+}
+
+::selection {
+  background-color: theme("colors.accent.dim");
+  color: theme("colors.ink.DEFAULT");
+}
+
+/* Scrollbar discreta, combinando com o tema dark */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: theme("colors.base.border");
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: theme("colors.ink.faint");
+}
+
+/* Respeita preferência de redução de movimento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
