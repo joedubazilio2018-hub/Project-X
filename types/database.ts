@@ -44,3 +44,34 @@ export type JournalEntry = {
   entry_date: string;
   created_at: string;
 };
+
+export type Category = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+};
+
+export type TransactionType = "income" | "expense";
+
+export type Transaction = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  type: TransactionType;
+  amount: number;
+  description: string | null;
+  date: string;
+  created_at: string;
+};
+
+export type FinancialGoal = {
+  id: string;
+  user_id: string;
+  title: string;
+  target_amount: number;
+  current_amount: number;
+  deadline: string | null;
+  created_at: string;
+};
