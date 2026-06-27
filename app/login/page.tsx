@@ -107,9 +107,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="font-display text-2xl font-bold text-ink">
-            Vida em Progresso
+            Ascen
           </h1>
-          <p className="mt-2 text-sm text-ink-muted">
+          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-faint">
+            by JB Group
+          </p>
+          <p className="mt-3 text-sm text-ink-muted">
             Seu painel pessoal de hábitos, metas e rotina.
           </p>
         </div>
