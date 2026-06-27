@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
+import SwipeRow from "@/components/SwipeRow";
 import type { Habit, HabitLog, HabitCategory } from "@/types/database";
 
 const CORES = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
@@ -399,56 +400,46 @@ export default function HabitosPage() {
             }
 
             return (
-              <li
-                key={habit.id}
-                className="group flex items-center justify-between rounded-xl border border-base-border bg-base-surface px-4 py-3.5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: cat?.color ?? habit.color }}
-                  />
-                  <div>
-                    <span
-                      className={`text-sm font-medium ${
-                        feito ? "text-ink-muted line-through" : "text-ink"
-                      }`}
-                    >
-                      {habit.name}
-                    </span>
-                    {cat && (
-                      <span className="ml-2 text-xs text-ink-faint">
-                        {cat.name}
-                      </span>
-                    )}
-                  </div>
-                </div>
+              <li key={habit.id}>
+                <SwipeRow
+                  onEdit={() => iniciarEdicaoHabito(habit)}
+                  onDelete={() => arquivarHabito(habit.id)}
+                >
+                  <div className="flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: cat?.color ?? habit.color }}
+                      />
+                      <div>
+                        <span
+                          className={`text-sm font-medium ${
+                            feito ? "text-ink-muted line-through" : "text-ink"
+                          }`}
+                        >
+                          {habit.name}
+                        </span>
+                        {cat && (
+                          <span className="ml-2 text-xs text-ink-faint">
+                            {cat.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => iniciarEdicaoHabito(habit)}
-                    className="hidden text-xs text-ink-faint transition-colors hover:text-accent group-hover:block"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => arquivarHabito(habit.id)}
-                    className="hidden text-xs text-ink-faint transition-colors hover:text-warn group-hover:block"
-                  >
-                    Arquivar
-                  </button>
-                  <button
-                    onClick={() => alternarCheckin(habit.id)}
-                    className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
-                      feito
-                        ? "border-accent bg-accent text-base"
-                        : "border-base-border text-ink-faint hover:border-accent hover:text-accent"
-                    }`}
-                    aria-label={feito ? "Desmarcar" : "Marcar como feito"}
-                  >
-                    {feito ? "✓" : ""}
-                  </button>
-                </div>
+                    <button
+                      onClick={() => alternarCheckin(habit.id)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                        feito
+                          ? "border-accent bg-accent text-base"
+                          : "border-base-border text-ink-faint hover:border-accent hover:text-accent"
+                      }`}
+                      aria-label={feito ? "Desmarcar" : "Marcar como feito"}
+                    >
+                      {feito ? "✓" : ""}
+                    </button>
+                  </div>
+                </SwipeRow>
               </li>
             );
           })}
