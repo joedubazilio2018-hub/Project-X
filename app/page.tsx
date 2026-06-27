@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
-import type { Habit, HabitLog, Goal, JournalEntry, Transaction } from "@/types/database";
+import type { Habit, HabitLog, Goal, JournalEntry, Transaction, Mood } from "@/types/database";
 
 type EventoTimeline = {
   data: string; // YYYY-MM-DD, usado para ordenar
@@ -68,20 +68,19 @@ export default function DashboardPage() {
     const { data: goalsData } = await supabase
       .from("goals")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .order("created_at", { ascending: false });
 
+    const dias30 = ultimosNDias(30);
     const { data: diarioData } = await supabase
       .from("journal_entries")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .gte("entry_date", dias30[0])
+      .order("created_at", { ascending: false });
 
     const { data: transacoesData } = await supabase
       .from("transactions")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .order("created_at", { ascending: false });
 
     setHabits((habitsData as Habit[]) ?? []);
     setLogs90dias((logsData as HabitLog[]) ?? []);
@@ -217,6 +216,57 @@ export default function DashboardPage() {
 
   const timeline = montarTimeline();
 
+  // Resumo de metas: contagens por status + próxima com prazo mais próximo
+  const metasEmAndamento = goalsRecentes.filter((g) => g.status === "in_progress").length;
+  const metasConcluidas = goalsRecentes.filter((g) => g.status === "done").length;
+  const metasNaoIniciadas = goalsRecentes.filter((g) => g.status === "not_started").length;
+
+  const proximaMetaComPrazo = goalsRecentes
+    .filter((g) => g.deadline && g.status !== "done")
+    .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""))[0];
+
+  function formatarDataCurta(iso: string): string {
+    const d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  }
+
+  // Resumo de diário: dias escritos nos últimos 30 dias + humor mais frequente
+  const MOOD_LABEL: Record<Mood, { label: string; emoji: string }> = {
+    great: { label: "Ótimo", emoji: "😄" },
+    good: { label: "Bom", emoji: "🙂" },
+    neutral: { label: "Neutro", emoji: "😐" },
+    hard: { label: "Difícil", emoji: "😔" },
+  };
+
+  const diasEscritos30 = diarioRecente.length;
+
+  function calcularHumorPredominante(): Mood | null {
+    const contagem: Record<string, number> = {};
+    diarioRecente.forEach((e) => {
+      if (e.mood) contagem[e.mood] = (contagem[e.mood] ?? 0) + 1;
+    });
+    const entradas = Object.entries(contagem);
+    if (entradas.length === 0) return null;
+    entradas.sort((a, b) => b[1] - a[1]);
+    return entradas[0][0] as Mood;
+  }
+
+  const humorPredominante = calcularHumorPredominante();
+
+  // Resumo financeiro: saldo total + gasto do mês atual
+  function formatarMoeda(valor: number): string {
+    return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  const saldoTotal = transacoesRecentes.reduce((acc, t) => {
+    return t.type === "income" ? acc + t.amount : acc - t.amount;
+  }, 0);
+
+  const mesAtual = hoje.slice(0, 7);
+  const gastoMes = transacoesRecentes
+    .filter((t) => t.type === "expense" && t.date.startsWith(mesAtual))
+    .reduce((acc, t) => acc + t.amount, 0);
+
   function formatarDataRelativa(iso: string): string {
     const data = new Date(iso + "T12:00:00");
     if (iso === hoje) return "Hoje";
@@ -258,6 +308,138 @@ export default function DashboardPage() {
               valor={String(habits.length)}
             />
           </div>
+
+          {/* Resumo de Metas */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Metas</h2>
+              <Link
+                href="/metas"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Ver todas →
+              </Link>
+            </div>
+
+            {goalsRecentes.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Você ainda não tem metas cadastradas.
+              </p>
+            ) : (
+              <>
+                <div className="mb-4 grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="font-display text-xl font-bold text-gold">
+                      {metasEmAndamento}
+                    </p>
+                    <p className="text-xs text-ink-muted">Em andamento</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-xl font-bold text-accent">
+                      {metasConcluidas}
+                    </p>
+                    <p className="text-xs text-ink-muted">Concluídas</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-xl font-bold text-ink-faint">
+                      {metasNaoIniciadas}
+                    </p>
+                    <p className="text-xs text-ink-muted">Não iniciadas</p>
+                  </div>
+                </div>
+
+                {proximaMetaComPrazo && (
+                  <div className="rounded-lg bg-base px-3 py-2.5">
+                    <p className="text-xs text-ink-faint">Próximo prazo</p>
+                    <p className="mt-0.5 text-sm text-ink">
+                      {proximaMetaComPrazo.title}
+                      <span className="ml-2 text-xs text-ink-muted">
+                        {formatarDataCurta(proximaMetaComPrazo.deadline!)}
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          {/* Resumo de Diário */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Diário</h2>
+              <Link
+                href="/diario"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Ver tudo →
+              </Link>
+            </div>
+
+            {diasEscritos30 === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Você ainda não escreveu nenhuma entrada nos últimos 30 dias.
+              </p>
+            ) : (
+              <div className="flex items-center gap-6">
+                <div>
+                  <p className="font-display text-xl font-bold text-ink">
+                    {diasEscritos30}
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    {diasEscritos30 === 1 ? "dia escrito" : "dias escritos"} (30 dias)
+                  </p>
+                </div>
+                {humorPredominante && (
+                  <div>
+                    <p className="font-display text-xl font-bold text-ink">
+                      {MOOD_LABEL[humorPredominante].emoji}
+                    </p>
+                    <p className="text-xs text-ink-muted">
+                      Humor mais frequente: {MOOD_LABEL[humorPredominante].label}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Resumo de Finanças */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Finanças</h2>
+              <Link
+                href="/financas"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Ver detalhes →
+              </Link>
+            </div>
+
+            {transacoesRecentes.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Você ainda não tem lançamentos cadastrados.
+              </p>
+            ) : (
+              <div className="flex items-center gap-6">
+                <div>
+                  <p
+                    className={`font-display text-xl font-bold ${
+                      saldoTotal >= 0 ? "text-accent" : "text-warn"
+                    }`}
+                  >
+                    {formatarMoeda(saldoTotal)}
+                  </p>
+                  <p className="text-xs text-ink-muted">Saldo total</p>
+                </div>
+                <div>
+                  <p className="font-display text-xl font-bold text-warn">
+                    {formatarMoeda(gastoMes)}
+                  </p>
+                  <p className="text-xs text-ink-muted">Gasto este mês</p>
+                </div>
+              </div>
+            )}
+          </section>
 
           <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink">
