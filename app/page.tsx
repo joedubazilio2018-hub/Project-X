@@ -21,11 +21,12 @@ function ultimosNDias(n: number): string[] {
 }
 
 const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+const DIAS_CALENDARIO = 90;
 
 export default function DashboardPage() {
   const supabase = createClient();
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [logsSemana, setLogsSemana] = useState<HabitLog[]>([]);
+  const [logs90dias, setLogs90dias] = useState<HabitLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [nomeUsuario, setNomeUsuario] = useState<string>("");
 
@@ -39,7 +40,7 @@ export default function DashboardPage() {
       setNomeUsuario(userData.user.email.split("@")[0]);
     }
 
-    const dias = ultimosNDias(7);
+    const dias = ultimosNDias(DIAS_CALENDARIO);
 
     const { data: habitsData } = await supabase
       .from("habits")
@@ -54,7 +55,7 @@ export default function DashboardPage() {
       .lte("date", dias[dias.length - 1]);
 
     setHabits((habitsData as Habit[]) ?? []);
-    setLogsSemana((logsData as HabitLog[]) ?? []);
+    setLogs90dias((logsData as HabitLog[]) ?? []);
     setLoading(false);
   }, [supabase]);
 
@@ -62,24 +63,24 @@ export default function DashboardPage() {
     carregar();
   }, [carregar]);
 
-  const dias = ultimosNDias(7);
+  const dias90 = ultimosNDias(DIAS_CALENDARIO);
+  const dias7 = dias90.slice(-7);
   const hoje = hojeISO();
 
-  const logsPorDia = dias.map((dia) => {
-    const logsDoDia = logsSemana.filter((l) => l.date === dia && l.done);
+  const logsPorDia7 = dias7.map((dia) => {
+    const logsDoDia = logs90dias.filter((l) => l.date === dia && l.done);
     const total = habits.length;
     const feitos = logsDoDia.length;
     return { dia, feitos, total, pct: total > 0 ? feitos / total : 0 };
   });
 
-  const feitosHoje = logsSemana.filter((l) => l.date === hoje && l.done).length;
+  const feitosHoje = logs90dias.filter((l) => l.date === hoje && l.done).length;
   const totalHoje = habits.length;
 
-  // Calcula streak (sequência) atual: dias consecutivos com >=1 hábito feito, terminando hoje ou ontem
   function calcularStreak(): number {
     let streak = 0;
     const datasComLog = new Set(
-      logsSemana.filter((l) => l.done).map((l) => l.date)
+      logs90dias.filter((l) => l.done).map((l) => l.date)
     );
     let cursor = new Date();
     while (true) {
@@ -95,6 +96,23 @@ export default function DashboardPage() {
   }
 
   const streak = calcularStreak();
+
+  // Monta os dados do calendário de constância (90 dias, intensidade pelo % de hábitos cumpridos)
+  const diasCalendario = dias90.map((dia) => {
+    const logsDoDia = logs90dias.filter((l) => l.date === dia && l.done);
+    const total = habits.length;
+    const feitos = logsDoDia.length;
+    const pct = total > 0 ? feitos / total : 0;
+    return { dia, feitos, total, pct };
+  });
+
+  function corIntensidade(pct: number, total: number): string {
+    if (total === 0) return "#161B26"; // sem hábitos cadastrados ainda nesse período
+    if (pct === 0) return "#1F2530";
+    if (pct < 0.5) return "#134E48";
+    if (pct < 1) return "#1E8F80";
+    return "#2DD4BF";
+  }
 
   return (
     <AppShell>
@@ -129,12 +147,12 @@ export default function DashboardPage() {
             />
           </div>
 
-          <section className="mb-8 rounded-xl border border-base-border bg-base-surface p-5">
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink">
               Últimos 7 dias
             </h2>
             <div className="flex items-end justify-between gap-2">
-              {logsPorDia.map(({ dia, pct, feitos, total }) => {
+              {logsPorDia7.map(({ dia, pct, feitos, total }) => {
                 const data = new Date(dia + "T12:00:00");
                 const isHoje = dia === hoje;
                 return (
@@ -157,6 +175,40 @@ export default function DashboardPage() {
                       {DIAS_SEMANA[data.getDay()]}
                     </span>
                   </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Calendário de constância — últimos 90 dias */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">
+                Constância (últimos 90 dias)
+              </h2>
+              <div className="flex items-center gap-1.5 text-xs text-ink-faint">
+                <span>Menos</span>
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1F2530" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#134E48" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1E8F80" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#2DD4BF" }} />
+                <span>Mais</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
+              {diasCalendario.map(({ dia, feitos, total, pct }) => {
+                const data = new Date(dia + "T12:00:00");
+                const label = data.toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "short",
+                });
+                return (
+                  <div
+                    key={dia}
+                    title={`${label}: ${feitos}/${total} hábitos`}
+                    className="aspect-square w-full rounded-sm"
+                    style={{ backgroundColor: corIntensidade(pct, total) }}
+                  />
                 );
               })}
             </div>
