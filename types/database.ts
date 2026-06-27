@@ -1,3 +1,11 @@
+export type HabitCategory = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+};
+
 export type Habit = {
   id: string;
   user_id: string;
@@ -5,6 +13,7 @@ export type Habit = {
   frequency: "daily" | "weekly";
   target_days: number[] | null;
   color: string;
+  category_id: string | null;
   created_at: string;
   archived: boolean;
 };
@@ -22,6 +31,14 @@ export type HabitWithLogs = Habit & {
   logs: HabitLog[];
 };
 
+export type GoalCategory = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+};
+
 export type GoalStatus = "not_started" | "in_progress" | "done";
 
 export type Goal = {
@@ -31,6 +48,7 @@ export type Goal = {
   description: string | null;
   deadline: string | null;
   status: GoalStatus;
+  category_id: string | null;
   created_at: string;
 };
 
