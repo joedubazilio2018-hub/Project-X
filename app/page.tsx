@@ -4,7 +4,15 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
-import type { Habit, HabitLog } from "@/types/database";
+import type { Habit, HabitLog, Goal, JournalEntry, Transaction } from "@/types/database";
+
+type EventoTimeline = {
+  data: string; // YYYY-MM-DD, usado para ordenar
+  criadoEm: string; // timestamp completo, usado para ordenar dentro do mesmo dia
+  tipo: "habito" | "meta" | "diario" | "financa";
+  texto: string;
+  cor: string;
+};
 
 function hojeISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -27,6 +35,9 @@ export default function DashboardPage() {
   const supabase = createClient();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs90dias, setLogs90dias] = useState<HabitLog[]>([]);
+  const [goalsRecentes, setGoalsRecentes] = useState<Goal[]>([]);
+  const [diarioRecente, setDiarioRecente] = useState<JournalEntry[]>([]);
+  const [transacoesRecentes, setTransacoesRecentes] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [nomeUsuario, setNomeUsuario] = useState<string>("");
 
@@ -54,8 +65,29 @@ export default function DashboardPage() {
       .gte("date", dias[0])
       .lte("date", dias[dias.length - 1]);
 
+    const { data: goalsData } = await supabase
+      .from("goals")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const { data: diarioData } = await supabase
+      .from("journal_entries")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const { data: transacoesData } = await supabase
+      .from("transactions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
     setHabits((habitsData as Habit[]) ?? []);
     setLogs90dias((logsData as HabitLog[]) ?? []);
+    setGoalsRecentes((goalsData as Goal[]) ?? []);
+    setDiarioRecente((diarioData as JournalEntry[]) ?? []);
+    setTransacoesRecentes((transacoesData as Transaction[]) ?? []);
     setLoading(false);
   }, [supabase]);
 
@@ -112,6 +144,86 @@ export default function DashboardPage() {
     if (pct < 0.5) return "#134E48";
     if (pct < 1) return "#1E8F80";
     return "#2DD4BF";
+  }
+
+  // Monta a linha do tempo unificada, juntando eventos de hábitos, metas, diário e finanças
+  function montarTimeline(): EventoTimeline[] {
+    const eventos: EventoTimeline[] = [];
+
+    logs90dias
+      .filter((l) => l.done)
+      .forEach((log) => {
+        const habito = habits.find((h) => h.id === log.habit_id);
+        eventos.push({
+          data: log.date,
+          criadoEm: log.created_at,
+          tipo: "habito",
+          texto: `Hábito concluído: ${habito?.name ?? "hábito"}`,
+          cor: "#2DD4BF",
+        });
+      });
+
+    goalsRecentes.forEach((goal) => {
+      if (goal.status === "done") {
+        eventos.push({
+          data: goal.created_at.slice(0, 10),
+          criadoEm: goal.created_at,
+          tipo: "meta",
+          texto: `Meta concluída: ${goal.title}`,
+          cor: "#F2B84B",
+        });
+      } else {
+        eventos.push({
+          data: goal.created_at.slice(0, 10),
+          criadoEm: goal.created_at,
+          tipo: "meta",
+          texto: `Meta criada: ${goal.title}`,
+          cor: "#F2B84B",
+        });
+      }
+    });
+
+    diarioRecente.forEach((entry) => {
+      eventos.push({
+        data: entry.entry_date,
+        criadoEm: entry.created_at,
+        tipo: "diario",
+        texto: "Entrada no diário",
+        cor: "#A78BFA",
+      });
+    });
+
+    transacoesRecentes.forEach((t) => {
+      const valorFormatado = t.amount.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+      eventos.push({
+        data: t.date,
+        criadoEm: t.created_at,
+        tipo: "financa",
+        texto:
+          t.type === "income"
+            ? `Receita registrada: ${valorFormatado}`
+            : `Despesa registrada: ${valorFormatado}`,
+        cor: t.type === "income" ? "#2DD4BF" : "#FB7185",
+      });
+    });
+
+    return eventos
+      .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
+      .slice(0, 12);
+  }
+
+  const timeline = montarTimeline();
+
+  function formatarDataRelativa(iso: string): string {
+    const data = new Date(iso + "T12:00:00");
+    if (iso === hoje) return "Hoje";
+    const ontem = new Date();
+    ontem.setDate(ontem.getDate() - 1);
+    if (iso === ontem.toISOString().slice(0, 10)) return "Ontem";
+    return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   }
 
   return (
@@ -212,6 +324,35 @@ export default function DashboardPage() {
                 );
               })}
             </div>
+          </section>
+
+          {/* Linha do tempo de eventos recentes */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <h2 className="mb-4 text-sm font-semibold text-ink">
+              Atividade recente
+            </h2>
+            {timeline.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Suas ações recentes vão aparecer aqui.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {timeline.map((evento, idx) => (
+                  <li key={idx} className="flex items-center gap-3">
+                    <span
+                      className="h-2 w-2 flex-shrink-0 rounded-full"
+                      style={{ backgroundColor: evento.cor }}
+                    />
+                    <span className="flex-1 text-sm text-ink-muted">
+                      {evento.texto}
+                    </span>
+                    <span className="flex-shrink-0 text-xs text-ink-faint">
+                      {formatarDataRelativa(evento.data)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {habits.length === 0 && (
