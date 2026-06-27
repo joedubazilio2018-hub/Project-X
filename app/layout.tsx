@@ -16,7 +16,7 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Vida em Progresso",
+  title: "Ascen",
   description: "Acompanhamento pessoal de hábitos, metas, diário e finanças.",
 };
 
