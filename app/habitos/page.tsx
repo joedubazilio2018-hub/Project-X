@@ -207,7 +207,7 @@ export default function HabitosPage() {
 
       {/* Categorias */}
       <section className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-ink">Categorias</h2>
           <button
             onClick={() => setMostrarFormCategoria((v) => !v)}
@@ -301,7 +301,7 @@ export default function HabitosPage() {
       </section>
 
       {/* Novo hábito */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">Seus hábitos</h2>
         <button
           onClick={() => setMostrarFormHabito((v) => !v)}
