@@ -193,7 +193,7 @@ export default function MetasPage() {
 
       {/* Categorias */}
       <section className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-ink">Categorias</h2>
           <button
             onClick={() => setMostrarFormCategoria((v) => !v)}
@@ -287,7 +287,7 @@ export default function MetasPage() {
       </section>
 
       {/* Nova meta */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">Suas metas</h2>
         <button
           onClick={() => setMostrarForm((v) => !v)}
