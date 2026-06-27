@@ -54,7 +54,7 @@ export default function Sidebar() {
       {/* Barra de topo — visível apenas no mobile (md:hidden) */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-base-border bg-base-surface px-4 py-3 md:hidden">
         <h1 className="font-display text-base font-bold text-ink">
-          Vida em Progresso
+          Ascen
         </h1>
         <button
           onClick={() => setAberto(true)}
@@ -81,8 +81,9 @@ export default function Sidebar() {
       <aside className="hidden h-screen w-56 flex-col border-r border-base-border bg-base-surface px-4 py-6 md:flex">
         <div className="mb-8 px-2">
           <h1 className="font-display text-base font-bold text-ink">
-            Vida em Progresso
+            Ascen
           </h1>
+          <p className="mt-0.5 text-xs text-ink-faint">by JB Group</p>
         </div>
         <NavLinks />
         <button
@@ -105,9 +106,12 @@ export default function Sidebar() {
           {/* Painel do menu, deslizando da esquerda */}
           <aside className="relative flex h-full w-64 max-w-[80%] flex-col border-r border-base-border bg-base-surface px-4 py-6 shadow-xl">
             <div className="mb-8 flex items-center justify-between px-2">
-              <h1 className="font-display text-base font-bold text-ink">
-                Vida em Progresso
-              </h1>
+              <div>
+                <h1 className="font-display text-base font-bold text-ink">
+                  Ascen
+                </h1>
+                <p className="mt-0.5 text-xs text-ink-faint">by JB Group</p>
+              </div>
               <button
                 onClick={() => setAberto(false)}
                 aria-label="Fechar menu"
