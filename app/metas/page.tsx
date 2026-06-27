@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
+import SwipeRow from "@/components/SwipeRow";
 import type { Goal, GoalStatus, GoalCategory } from "@/types/database";
 
 const CORES = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
@@ -419,87 +420,75 @@ export default function MetasPage() {
             }
 
             return (
-              <li
-                key={goal.id}
-                className="group rounded-xl border border-base-border bg-base-surface p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+              <li key={goal.id}>
+                <SwipeRow
+                  onEdit={() => iniciarEdicao(goal)}
+                  onDelete={() => excluirMeta(goal.id)}
+                >
+                  <div className="p-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        {cat && (
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                        )}
+                        <h3
+                          className={`text-sm font-semibold ${
+                            goal.status === "done"
+                              ? "text-ink-muted line-through"
+                              : "text-ink"
+                          }`}
+                        >
+                          {goal.title}
+                        </h3>
+                      </div>
                       {cat && (
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        />
+                        <p className="mt-1 text-xs text-ink-faint">{cat.name}</p>
                       )}
-                      <h3
-                        className={`text-sm font-semibold ${
-                          goal.status === "done"
-                            ? "text-ink-muted line-through"
-                            : "text-ink"
-                        }`}
-                      >
-                        {goal.title}
-                      </h3>
+                      {goal.description && (
+                        <p className="mt-1 text-sm text-ink-muted">
+                          {goal.description}
+                        </p>
+                      )}
+                      {goal.deadline && (
+                        <p className="mt-2 text-xs text-ink-faint">
+                          Prazo: {formatarData(goal.deadline)}
+                        </p>
+                      )}
                     </div>
-                    {cat && (
-                      <p className="mt-1 text-xs text-ink-faint">{cat.name}</p>
-                    )}
-                    {goal.description && (
-                      <p className="mt-1 text-sm text-ink-muted">
-                        {goal.description}
-                      </p>
-                    )}
-                    {goal.deadline && (
-                      <p className="mt-2 text-xs text-ink-faint">
-                        Prazo: {formatarData(goal.deadline)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => iniciarEdicao(goal)}
-                      className="hidden text-xs text-ink-faint transition-colors hover:text-accent group-hover:block"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => excluirMeta(goal.id)}
-                      className="hidden text-xs text-ink-faint transition-colors hover:text-warn group-hover:block"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </div>
 
-                <div className="mt-3 flex gap-1.5">
-                  {(["not_started", "in_progress", "done"] as GoalStatus[]).map(
-                    (status) => (
-                      <button
-                        key={status}
-                        onClick={() => mudarStatus(goal.id, status)}
-                        className="rounded-full px-3 py-1 text-xs font-medium transition-colors"
-                        style={{
-                          backgroundColor:
-                            goal.status === status
-                              ? `${STATUS_COLOR[status]}26`
-                              : "transparent",
-                          color:
-                            goal.status === status
-                              ? STATUS_COLOR[status]
-                              : "#5A6172",
-                          border: `1px solid ${
-                            goal.status === status
-                              ? STATUS_COLOR[status]
-                              : "#1F2530"
-                          }`,
-                        }}
-                      >
-                        {STATUS_LABEL[status]}
-                      </button>
-                    )
-                  )}
-                </div>
+                    <div className="mt-3 flex gap-1.5">
+                      {(["not_started", "in_progress", "done"] as GoalStatus[]).map(
+                        (status) => (
+                          <button
+                            key={status}
+                            onClick={() => mudarStatus(goal.id, status)}
+                            className="rounded-full px-3 py-1 text-xs font-medium transition-colors"
+                            style={{
+                              backgroundColor:
+                                goal.status === status
+                                  ? `${STATUS_COLOR[status]}26`
+                                  : "transparent",
+                              color:
+                                goal.status === status
+                                  ? STATUS_COLOR[status]
+                                  : "#5A6172",
+                              border: `1px solid ${
+                                goal.status === status
+                                  ? STATUS_COLOR[status]
+                                  : "#1F2530"
+                              }`,
+                            }}
+                          >
+                            {STATUS_LABEL[status]}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </SwipeRow>
               </li>
             );
           })}
