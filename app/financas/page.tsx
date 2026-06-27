@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
+import SwipeRow from "@/components/SwipeRow";
 import type {
   Category,
   Transaction,
@@ -257,7 +258,7 @@ export default function FinancasPage() {
       ) : (
         <>
           {/* Cards de resumo */}
-          <div className="mb-6 grid grid-cols-3 gap-4">
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="rounded-xl border border-base-border bg-base-surface p-4">
               <p className="text-xs text-ink-muted">Saldo total</p>
               <p
@@ -283,7 +284,7 @@ export default function FinancasPage() {
           </div>
 
           {/* Gráficos */}
-          <div className="mb-6 grid grid-cols-2 gap-4">
+          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-base-border bg-base-surface p-5">
               <h2 className="mb-3 text-sm font-semibold text-ink">
                 Gastos por categoria (mês)
@@ -358,7 +359,7 @@ export default function FinancasPage() {
 
           {/* Metas financeiras */}
           <section className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Metas financeiras</h2>
               <button
                 onClick={() => setMostrarFormMeta((v) => !v)}
@@ -371,13 +372,13 @@ export default function FinancasPage() {
             {mostrarFormMeta && (
               <form
                 onSubmit={criarMetaFinanceira}
-                className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-base-border bg-base-surface p-4"
+                className="mb-3 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-4 sm:flex-row sm:flex-wrap sm:items-center"
               >
                 <input
                   value={tituloMeta}
                   onChange={(e) => setTituloMeta(e.target.value)}
                   placeholder="Ex: Guardar por mês"
-                  className="min-w-[180px] flex-1 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:min-w-[180px] sm:flex-1"
                   required
                 />
                 <input
@@ -385,13 +386,13 @@ export default function FinancasPage() {
                   onChange={(e) => setValorMeta(e.target.value)}
                   placeholder="Valor alvo (ex: 500)"
                   inputMode="decimal"
-                  className="w-40 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-40"
                   required
                 />
                 <button
                   type="submit"
                   disabled={salvando}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto"
                 >
                   Salvar
                 </button>
@@ -444,7 +445,7 @@ export default function FinancasPage() {
 
           {/* Categorias */}
           <section className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Categorias</h2>
               <button
                 onClick={() => setMostrarFormCategoria((v) => !v)}
@@ -503,7 +504,7 @@ export default function FinancasPage() {
 
           {/* Lançamentos */}
           <section>
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Lançamentos</h2>
               <button
                 onClick={() => setMostrarFormLancamento((v) => !v)}
@@ -543,13 +544,13 @@ export default function FinancasPage() {
                   </button>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <input
                     value={valor}
                     onChange={(e) => setValor(e.target.value)}
                     placeholder="Valor (ex: 49,90)"
                     inputMode="decimal"
-                    className="flex-1 rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                    className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:flex-1"
                     required
                   />
                   <input
@@ -601,41 +602,37 @@ export default function FinancasPage() {
                 {transactions.slice(0, 30).map((t) => {
                   const cat = categories.find((c) => c.id === t.category_id);
                   return (
-                    <li
-                      key={t.id}
-                      className="group flex items-center justify-between rounded-xl border border-base-border bg-base-surface px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: cat?.color ?? "#5A6172" }}
-                        />
-                        <div>
-                          <p className="text-sm text-ink">
-                            {t.description || cat?.name || "Lançamento"}
-                          </p>
-                          <p className="text-xs text-ink-faint">
-                            {formatarDataCurta(t.date)}
-                            {cat ? ` · ${cat.name}` : ""}
-                          </p>
+                    <li key={t.id}>
+                      <SwipeRow
+                        onEdit={() => {}}
+                        onDelete={() => excluirLancamento(t.id)}
+                      >
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: cat?.color ?? "#5A6172" }}
+                            />
+                            <div>
+                              <p className="text-sm text-ink">
+                                {t.description || cat?.name || "Lançamento"}
+                              </p>
+                              <p className="text-xs text-ink-faint">
+                                {formatarDataCurta(t.date)}
+                                {cat ? ` · ${cat.name}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            className={`text-sm font-semibold ${
+                              t.type === "income" ? "text-accent" : "text-warn"
+                            }`}
+                          >
+                            {t.type === "income" ? "+" : "−"}
+                            {formatarMoeda(t.amount)}
+                          </span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`text-sm font-semibold ${
-                            t.type === "income" ? "text-accent" : "text-warn"
-                          }`}
-                        >
-                          {t.type === "income" ? "+" : "−"}
-                          {formatarMoeda(t.amount)}
-                        </span>
-                        <button
-                          onClick={() => excluirLancamento(t.id)}
-                          className="hidden text-xs text-ink-faint transition-colors hover:text-warn group-hover:block"
-                        >
-                          Excluir
-                        </button>
-                      </div>
+                      </SwipeRow>
                     </li>
                   );
                 })}
