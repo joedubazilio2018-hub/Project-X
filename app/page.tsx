@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
+import { frasedoDia } from "@/lib/frase-do-dia";
 import AppShell from "@/components/AppShell";
 import type { Habit, HabitLog, Goal, JournalEntry, Transaction, Mood } from "@/types/database";
 
@@ -215,6 +216,7 @@ export default function DashboardPage() {
   }
 
   const timeline = montarTimeline();
+  const frase = frasedoDia();
 
   // Resumo de metas: contagens por status + próxima com prazo mais próximo
   const metasEmAndamento = goalsRecentes.filter((g) => g.status === "in_progress").length;
@@ -278,7 +280,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      <header className="mb-8">
+      <header className="mb-6">
         <h1 className="font-display text-2xl font-bold text-ink">
           {saudacao()}
           {nomeUsuario ? `, ${nomeUsuario}` : ""}.
@@ -287,6 +289,13 @@ export default function DashboardPage() {
           Aqui está seu progresso recente.
         </p>
       </header>
+
+      <section className="mb-8 rounded-xl border border-gold/30 bg-base-surface p-5">
+        <p className="font-display text-base font-semibold leading-snug text-ink">
+          "{frase.frase}"
+        </p>
+        <p className="mt-2 text-sm text-ink-muted">{frase.explicacao}</p>
+      </section>
 
       {loading ? (
         <p className="text-sm text-ink-muted">Carregando...</p>
