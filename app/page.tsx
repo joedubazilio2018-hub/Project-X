@@ -129,6 +129,64 @@ export default function DashboardPage() {
 
   const streak = calcularStreak();
 
+  // ── Score Diário ──
+  // Hábitos valem até 70 pontos (proporcional ao % concluído hoje).
+  // Metas valem até 30 pontos: meta concluída hoje = 15 pts (máx 2 = 30);
+  // meta criada ou movida para "em andamento" hoje = 5 pts.
+  const metasConcluidasHoje = goalsRecentes.filter(
+    (g) => g.status === "done" && g.status_changed_at.slice(0, 10) === hoje
+  ).length;
+  const metasMovimentadasHoje = goalsRecentes.filter(
+    (g) => g.status !== "done" && g.status_changed_at.slice(0, 10) === hoje
+  ).length;
+
+  const pontosHabitos = totalHoje > 0 ? (feitosHoje / totalHoje) * 70 : null;
+  const pontosMetas = Math.min(metasConcluidasHoje * 15, 30) + metasMovimentadasHoje * 5;
+
+  const temAtividadeHoje =
+    pontosHabitos !== null || metasConcluidasHoje > 0 || metasMovimentadasHoje > 0;
+
+  const scoreDiario = temAtividadeHoje
+    ? Math.min(Math.round((pontosHabitos ?? 0) + pontosMetas), 100)
+    : null;
+
+  function corDoScore(score: number | null): string {
+    if (score === null) return "#5A6172";
+    if (score >= 80) return "#2DD4BF";
+    if (score >= 50) return "#34D399";
+    if (score >= 20) return "#F2B84B";
+    return "#FB7185";
+  }
+
+  function explicacaoDoScore(): string {
+    if (!temAtividadeHoje) {
+      return "Cadastre hábitos ou avance em uma meta para começar a pontuar hoje.";
+    }
+
+    const partes: string[] = [];
+
+    if (totalHoje > 0) {
+      partes.push(`${feitosHoje} de ${totalHoje} hábitos concluídos`);
+    }
+    if (metasConcluidasHoje > 0) {
+      partes.push(
+        `${metasConcluidasHoje} ${metasConcluidasHoje === 1 ? "meta concluída" : "metas concluídas"}`
+      );
+    }
+    if (metasMovimentadasHoje > 0) {
+      partes.push(
+        `${metasMovimentadasHoje} ${metasMovimentadasHoje === 1 ? "meta avançou" : "metas avançaram"}`
+      );
+    }
+
+    const resumo = partes.join(", ");
+
+    if (scoreDiario !== null && scoreDiario >= 80) return `Excelente ritmo. ${resumo}.`;
+    if (scoreDiario !== null && scoreDiario >= 50) return `Bom ritmo. ${resumo}.`;
+    if (scoreDiario !== null && scoreDiario >= 20) return `Ritmo regular. ${resumo}.`;
+    return `Ainda dá tempo de melhorar hoje. ${resumo}.`;
+  }
+
   // Monta os dados do calendário de constância (90 dias, intensidade pelo % de hábitos cumpridos)
   const diasCalendario = dias90.map((dia) => {
     const logsDoDia = logs90dias.filter((l) => l.date === dia && l.done);
@@ -301,6 +359,27 @@ export default function DashboardPage() {
         <p className="text-sm text-ink-muted">Carregando...</p>
       ) : (
         <>
+          {/* Score Diário */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full border-2 font-display text-xl font-bold"
+                style={{
+                  borderColor: corDoScore(scoreDiario),
+                  color: corDoScore(scoreDiario),
+                }}
+              >
+                {scoreDiario ?? "—"}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink">Score de hoje</p>
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {explicacaoDoScore()}
+                </p>
+              </div>
+            </div>
+          </section>
+
           <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <CardEstatistica
               label="Hoje"
