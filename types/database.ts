@@ -11,7 +11,7 @@ export type Habit = {
   user_id: string;
   name: string;
   frequency: "daily" | "weekly";
-  target_days: number[] | null;
+  target_days: number[] | null; // 0=domingo ... 6=sábado, null = todo dia
   color: string;
   category_id: string | null;
   created_at: string;
@@ -22,7 +22,7 @@ export type HabitLog = {
   id: string;
   habit_id: string;
   user_id: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   done: boolean;
   created_at: string;
 };
@@ -46,10 +46,11 @@ export type Goal = {
   user_id: string;
   title: string;
   description: string | null;
-  deadline: string | null;
+  deadline: string | null; // YYYY-MM-DD
   status: GoalStatus;
   category_id: string | null;
   created_at: string;
+  status_changed_at: string;
 };
 
 export type Mood = "great" | "good" | "neutral" | "hard";
@@ -59,7 +60,7 @@ export type JournalEntry = {
   user_id: string;
   content: string;
   mood: Mood | null;
-  entry_date: string;
+  entry_date: string; // YYYY-MM-DD
   created_at: string;
 };
 
@@ -80,7 +81,7 @@ export type Transaction = {
   type: TransactionType;
   amount: number;
   description: string | null;
-  date: string;
+  date: string; // YYYY-MM-DD
   created_at: string;
 };
 
