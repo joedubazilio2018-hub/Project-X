@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Sora } from "next/font/google";
+import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
 import "./globals.css";
 
 const inter = Inter({
@@ -18,6 +19,20 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "Ascen",
   description: "Acompanhamento pessoal de hábitos, metas, diário e finanças.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Ascen",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0B0E14",
 };
 
 export default function RootLayout({
@@ -27,7 +42,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${sora.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <RegistrarServiceWorker />
+        {children}
+      </body>
     </html>
   );
 }
