@@ -60,7 +60,7 @@ export default function BotaoNotificacao() {
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(chavePublica),
+        applicationServerKey: urlBase64ToUint8Array(chavePublica).buffer as ArrayBuffer,
       });
 
       const json = subscription.toJSON();
