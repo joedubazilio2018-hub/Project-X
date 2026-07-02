@@ -76,6 +76,7 @@ export type Transaction = {
   recurrence_group_id: string | null; // agrupa todas as parcelas de um mesmo lançamento
   installment_number: number | null; // ex: 1, 2, 3...
   installment_total: number | null; // ex: 3 (total de parcelas)
+  paid: boolean; // se a conta/lançamento já foi pago (ou recebido)
 };
 export type FinancialGoal = {
   id: string;
