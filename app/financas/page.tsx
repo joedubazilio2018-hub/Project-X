@@ -360,11 +360,11 @@ export default function FinancasPage() {
     .filter((t) => t.type === "expense")
     .reduce((a, t) => a + t.amount, 0);
 
-  // Somente lançamentos até hoje entram no histórico da lista principal
-  // (parcelas futuras aparecem na seção de Planejamento)
+  // Lançamentos do mês atual (mesmo os que ainda vão vencer) entram na lista
+  // principal; só os meses seguintes ficam exclusivos da seção de Planejamento
   const historicoLancamentos = useMemo(
-    () => transactions.filter((t) => t.date <= hojeISO()),
-    [transactions]
+    () => transactions.filter((t) => t.date.slice(0, 7) <= mesAtual),
+    [transactions, mesAtual]
   );
 
   const contasAtrasadas = useMemo(
