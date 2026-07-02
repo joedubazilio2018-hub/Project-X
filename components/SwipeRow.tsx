@@ -13,11 +13,14 @@ type SwipeRowProps = {
 /**
  * Envolve um item de lista para revelar ações de Editar/Excluir:
  * - Mobile/touch: arrastar o item para a esquerda revela os botões
- * - Desktop: passar o mouse por cima (hover) revela os mesmos botões,
- *   sem precisar arrastar
+ *   (o conteúdo desliza, exatamente como antes)
+ * - Desktop: passar o mouse por cima (hover) revela os botões com um
+ *   FADE por cima, sem deslocar o conteúdo. Assim os cliques dentro do
+ *   item (ex: confirmar pagamento) continuam caindo no lugar certo,
+ *   mesmo com o mouse em cima da linha.
  */
 export default function SwipeRow({ children, onEdit, onDelete }: SwipeRowProps) {
-  const [offset, setOffset] = useState(0); // deslocamento atual (negativo = aberto)
+  const [offset, setOffset] = useState(0); // deslocamento atual (negativo = aberto, só touch)
   const arrastando = useRef(false);
   const inicioX = useRef(0);
   const offsetInicial = useRef(0);
@@ -46,15 +49,20 @@ export default function SwipeRow({ children, onEdit, onDelete }: SwipeRowProps) 
     setOffset(0);
   }
 
-  // Se o item já foi arrastado pelo toque, esse deslocamento manda (JS).
-  // Caso contrário (offset 0), o hover do desktop assume via CSS puro.
-  const usandoOffsetManual = offset !== 0;
+  const abertoPeloToque = offset !== 0;
 
   return (
     <div className="group relative overflow-hidden rounded-xl border border-base-border">
-      {/* Botões de ação, revelados por baixo */}
+      {/* Botões de ação: ficam sempre nessa posição (extremo direito).
+          Por padrão invisíveis e sem capturar clique. Ficam visíveis:
+          - no desktop, via CSS puro (:hover), com fade
+          - no mobile, via JS, quando o usuário arrastou o item (abertoPeloToque) */}
       <div
-        className="absolute inset-y-0 right-0 flex"
+        className={`absolute inset-y-0 right-0 z-10 flex transition-opacity duration-150 ${
+          abertoPeloToque
+            ? "opacity-100"
+            : "pointer-events-none opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100"
+        }`}
         style={{ width: LARGURA_ACOES }}
       >
         <button
@@ -77,15 +85,12 @@ export default function SwipeRow({ children, onEdit, onDelete }: SwipeRowProps) 
         </button>
       </div>
 
-      {/* Conteúdo arrastável (touch) / revelado por hover (desktop) */}
+      {/* Conteúdo do item. No desktop NÃO se move mais no hover — só o
+          arrastar por toque (mobile) desloca ele para revelar os botões. */}
       <div
-        className={
-          usandoOffsetManual
-            ? "relative bg-base-surface"
-            : "relative bg-base-surface transition-transform duration-200 md:group-hover:-translate-x-36"
-        }
+        className="relative bg-base-surface"
         style={
-          usandoOffsetManual
+          abertoPeloToque
             ? {
                 transform: `translateX(${offset}px)`,
                 transition: arrastando.current ? "none" : "transform 0.2s ease-out",
