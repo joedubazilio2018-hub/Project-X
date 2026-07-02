@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase-browser'
 
 export default function NotasPage() {
-  const [notes, setNotes] = useState([])
+  const [notes, setNotes] = useState<any[]>([])
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
 
