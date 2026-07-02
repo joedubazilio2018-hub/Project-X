@@ -174,7 +174,7 @@ export default function FinancasPage() {
       } else {
         await supabase
           .from("transactions")
-          .update({ ...camposComuns, date })
+          .update({ ...camposComuns, date: data })
           .eq("id", editandoTransacao.id);
       }
 
