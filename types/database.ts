@@ -5,7 +5,6 @@ export type HabitCategory = {
   color: string;
   created_at: string;
 };
-
 export type Habit = {
   id: string;
   user_id: string;
@@ -17,7 +16,6 @@ export type Habit = {
   created_at: string;
   archived: boolean;
 };
-
 export type HabitLog = {
   id: string;
   habit_id: string;
@@ -26,11 +24,9 @@ export type HabitLog = {
   done: boolean;
   created_at: string;
 };
-
 export type HabitWithLogs = Habit & {
   logs: HabitLog[];
 };
-
 export type GoalCategory = {
   id: string;
   user_id: string;
@@ -38,9 +34,7 @@ export type GoalCategory = {
   color: string;
   created_at: string;
 };
-
 export type GoalStatus = "not_started" | "in_progress" | "done";
-
 export type Goal = {
   id: string;
   user_id: string;
@@ -52,9 +46,7 @@ export type Goal = {
   created_at: string;
   status_changed_at: string;
 };
-
 export type Mood = "great" | "good" | "neutral" | "hard";
-
 export type JournalEntry = {
   id: string;
   user_id: string;
@@ -63,7 +55,6 @@ export type JournalEntry = {
   entry_date: string; // YYYY-MM-DD
   created_at: string;
 };
-
 export type Category = {
   id: string;
   user_id: string;
@@ -71,9 +62,7 @@ export type Category = {
   color: string;
   created_at: string;
 };
-
 export type TransactionType = "income" | "expense";
-
 export type Transaction = {
   id: string;
   user_id: string;
@@ -83,8 +72,11 @@ export type Transaction = {
   description: string | null;
   date: string; // YYYY-MM-DD
   created_at: string;
+  // Recorrência / parcelamento
+  recurrence_group_id: string | null; // agrupa todas as parcelas de um mesmo lançamento
+  installment_number: number | null; // ex: 1, 2, 3...
+  installment_total: number | null; // ex: 3 (total de parcelas)
 };
-
 export type FinancialGoal = {
   id: string;
   user_id: string;
