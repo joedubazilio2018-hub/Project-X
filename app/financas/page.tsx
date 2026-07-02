@@ -76,6 +76,11 @@ export default function FinancasPage() {
   const [repetir, setRepetir] = useState(false);
   const [totalParcelas, setTotalParcelas] = useState("2");
 
+  // Edição de lançamento existente
+  const [editandoTransacao, setEditandoTransacao] = useState<Transaction | null>(null);
+  const [aplicarEmTodasParcelas, setAplicarEmTodasParcelas] = useState(false);
+  const editandoId = editandoTransacao?.id ?? null;
+
   // Formulário de categoria
   const [novaCategoria, setNovaCategoria] = useState("");
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
@@ -116,12 +121,70 @@ export default function FinancasPage() {
   }, [carregar]);
 
   // ── Lançamentos ──
-  async function criarLancamento(e: React.FormEvent) {
+  function resetFormLancamento() {
+    setValor("");
+    setDescricao("");
+    setCategoriaId("");
+    setData(hojeISO());
+    setRepetir(false);
+    setTotalParcelas("2");
+    setMostrarFormLancamento(false);
+    setEditandoTransacao(null);
+    setAplicarEmTodasParcelas(false);
+  }
+
+  function iniciarEdicao(t: Transaction) {
+    setEditandoTransacao(t);
+    setAplicarEmTodasParcelas(false);
+    setTipo(t.type);
+    setValor(String(t.amount).replace(".", ","));
+    setCategoriaId(t.category_id ?? "");
+    setDescricao(t.description ?? "");
+    setData(t.date);
+    setRepetir(false);
+    setMostrarFormLancamento(true);
+  }
+
+  function cancelarEdicao() {
+    resetFormLancamento();
+  }
+
+  async function salvarLancamento(e: React.FormEvent) {
     e.preventDefault();
     const valorNum = parseFloat(valor.replace(",", "."));
     if (!valorNum || valorNum <= 0) return;
     setSalvando(true);
 
+    // ── Modo edição: atualiza o lançamento existente ──
+    if (editandoTransacao) {
+      const camposComuns = {
+        type: tipo,
+        amount: valorNum,
+        category_id: categoriaId || null,
+        description: descricao.trim() || null,
+      };
+
+      if (aplicarEmTodasParcelas && editandoTransacao.recurrence_group_id) {
+        // Atualiza valor/categoria/descrição/tipo em todas as parcelas do grupo,
+        // sem mexer na data individual de cada uma
+        await supabase
+          .from("transactions")
+          .update(camposComuns)
+          .eq("recurrence_group_id", editandoTransacao.recurrence_group_id);
+      } else {
+        await supabase
+          .from("transactions")
+          .update({ ...camposComuns, date })
+          .eq("id", editandoTransacao.id);
+      }
+
+      resetFormLancamento();
+      setSalvando(false);
+      carregar();
+      return;
+    }
+
+    // ── Modo criação: insere um ou vários (recorrência) ──
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) {
@@ -146,13 +209,7 @@ export default function FinancasPage() {
 
     await supabase.from("transactions").insert(linhas);
 
-    setValor("");
-    setDescricao("");
-    setCategoriaId("");
-    setData(hojeISO());
-    setRepetir(false);
-    setTotalParcelas("2");
-    setMostrarFormLancamento(false);
+    resetFormLancamento();
     setSalvando(false);
     carregar();
   }
@@ -597,7 +654,13 @@ export default function FinancasPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Lançamentos</h2>
               <button
-                onClick={() => setMostrarFormLancamento((v) => !v)}
+                onClick={() => {
+                  if (mostrarFormLancamento) {
+                    resetFormLancamento();
+                  } else {
+                    setMostrarFormLancamento(true);
+                  }
+                }}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90"
               >
                 {mostrarFormLancamento ? "Cancelar" : "+ Novo lançamento"}
@@ -606,9 +669,48 @@ export default function FinancasPage() {
 
             {mostrarFormLancamento && (
               <form
-                onSubmit={criarLancamento}
+                onSubmit={salvarLancamento}
                 className="mb-4 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-5"
               >
+                {editandoId && (
+                  <p className="text-xs font-medium text-accent">
+                    Editando lançamento existente
+                  </p>
+                )}
+
+                {editandoTransacao?.recurrence_group_id && (
+                  <div className="rounded-lg border border-accent/40 bg-accent-dim p-3 text-xs">
+                    <p className="mb-2 font-medium text-ink">
+                      Essa parcela faz parte de uma recorrência (
+                      {editandoTransacao.installment_number}/
+                      {editandoTransacao.installment_total}). Deseja alterar
+                      apenas esta parcela ou todas as parcelas desse grupo?
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="flex items-center gap-2 text-ink-muted">
+                        <input
+                          type="radio"
+                          name="escopoEdicao"
+                          checked={!aplicarEmTodasParcelas}
+                          onChange={() => setAplicarEmTodasParcelas(false)}
+                          className="accent-accent"
+                        />
+                        Somente esta parcela
+                      </label>
+                      <label className="flex items-center gap-2 text-ink-muted">
+                        <input
+                          type="radio"
+                          name="escopoEdicao"
+                          checked={aplicarEmTodasParcelas}
+                          onChange={() => setAplicarEmTodasParcelas(true)}
+                          className="accent-accent"
+                        />
+                        Todas as parcelas do grupo (valor, categoria, descrição
+                        e tipo — as datas de cada parcela não mudam)
+                      </label>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -643,12 +745,20 @@ export default function FinancasPage() {
                     className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:flex-1"
                     required
                   />
-                  <input
-                    type="date"
-                    value={data}
-                    onChange={(e) => setData(e.target.value)}
-                    className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                  />
+                  <div className="flex flex-col gap-1">
+                    <input
+                      type="date"
+                      value={data}
+                      onChange={(e) => setData(e.target.value)}
+                      disabled={aplicarEmTodasParcelas}
+                      className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50"
+                    />
+                    {aplicarEmTodasParcelas && (
+                      <span className="text-xs text-ink-faint">
+                        Datas individuais não mudam
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <select
@@ -671,43 +781,56 @@ export default function FinancasPage() {
                   className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
 
-                {/* Recorrência / parcelamento */}
-                <div className="flex flex-col gap-2 rounded-lg border border-base-border bg-base p-3">
-                  <label className="flex items-center gap-2 text-sm text-ink">
-                    <input
-                      type="checkbox"
-                      checked={repetir}
-                      onChange={(e) => setRepetir(e.target.checked)}
-                      className="h-4 w-4 rounded border-base-border accent-accent"
-                    />
-                    Repetir em vários meses (parcelado ou recorrente)
-                  </label>
-
-                  {repetir && (
-                    <div className="flex items-center gap-2 pl-6">
-                      <span className="text-xs text-ink-muted">Repetir por</span>
+                {/* Recorrência / parcelamento — só ao criar, não ao editar */}
+                {!editandoId && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-base-border bg-base p-3">
+                    <label className="flex items-center gap-2 text-sm text-ink">
                       <input
-                        type="number"
-                        min={2}
-                        max={36}
-                        value={totalParcelas}
-                        onChange={(e) => setTotalParcelas(e.target.value)}
-                        className="w-16 rounded-lg border border-base-border bg-base-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                        type="checkbox"
+                        checked={repetir}
+                        onChange={(e) => setRepetir(e.target.checked)}
+                        className="h-4 w-4 rounded border-base-border accent-accent"
                       />
-                      <span className="text-xs text-ink-muted">
-                        meses (vai aparecer como 1/{totalParcelas || "?"}, 2/{totalParcelas || "?"}...)
-                      </span>
-                    </div>
+                      Repetir em vários meses (parcelado ou recorrente)
+                    </label>
+
+                    {repetir && (
+                      <div className="flex items-center gap-2 pl-6">
+                        <span className="text-xs text-ink-muted">Repetir por</span>
+                        <input
+                          type="number"
+                          min={2}
+                          max={36}
+                          value={totalParcelas}
+                          onChange={(e) => setTotalParcelas(e.target.value)}
+                          className="w-16 rounded-lg border border-base-border bg-base-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                        />
+                        <span className="text-xs text-ink-muted">
+                          meses (vai aparecer como 1/{totalParcelas || "?"}, 2/{totalParcelas || "?"}...)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={salvando}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {editandoId ? "Salvar alterações" : "Salvar lançamento"}
+                  </button>
+                  {editandoId && (
+                    <button
+                      type="button"
+                      onClick={cancelarEdicao}
+                      className="text-sm font-medium text-ink-muted hover:text-ink"
+                    >
+                      Cancelar edição
+                    </button>
                   )}
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={salvando}
-                  className="self-start rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  Salvar lançamento
-                </button>
               </form>
             )}
 
@@ -724,7 +847,7 @@ export default function FinancasPage() {
                   return (
                     <li key={t.id}>
                       <SwipeRow
-                        onEdit={() => {}}
+                        onEdit={() => iniciarEdicao(t)}
                         onDelete={() => excluirLancamento(t)}
                       >
                         <div className="flex items-center justify-between px-4 py-3">
