@@ -180,6 +180,40 @@ export default function FinancasPage() {
           .from("transactions")
           .update(camposComuns)
           .eq("recurrence_group_id", editandoTransacao.recurrence_group_id);
+      } else if (!editandoTransacao.recurrence_group_id && repetir) {
+        // Transforma um lançamento avulso em recorrência: este lançamento
+        // vira a parcela 1, e as parcelas seguintes são criadas a partir dele
+        const qtdParcelas = Math.max(2, parseInt(totalParcelas, 10) || 2);
+        const grupoId = crypto.randomUUID();
+
+        await supabase
+          .from("transactions")
+          .update({
+            ...camposComuns,
+            date: data,
+            recurrence_group_id: grupoId,
+            installment_number: 1,
+            installment_total: qtdParcelas,
+          })
+          .eq("id", editandoTransacao.id);
+
+        const novasParcelas = Array.from({ length: qtdParcelas - 1 }).map(
+          (_, i) => ({
+            user_id: editandoTransacao.user_id,
+            type: tipo,
+            amount: valorNum,
+            category_id: categoriaId || null,
+            description: descricao.trim() || null,
+            date: adicionarMeses(data, i + 1),
+            recurrence_group_id: grupoId,
+            installment_number: i + 2,
+            installment_total: qtdParcelas,
+          })
+        );
+
+        if (novasParcelas.length > 0) {
+          await supabase.from("transactions").insert(novasParcelas);
+        }
       } else {
         await supabase
           .from("transactions")
@@ -806,8 +840,9 @@ export default function FinancasPage() {
                   className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
 
-                {/* Recorrência / parcelamento — só ao criar, não ao editar */}
-                {!editandoId && (
+                {/* Recorrência / parcelamento — ao criar, ou ao editar um lançamento
+                    avulso que ainda não pertence a um grupo de recorrência */}
+                {(!editandoId || !editandoTransacao?.recurrence_group_id) && (
                   <div className="flex flex-col gap-2 rounded-lg border border-base-border bg-base p-3">
                     <label className="flex items-center gap-2 text-sm text-ink">
                       <input
@@ -816,7 +851,9 @@ export default function FinancasPage() {
                         onChange={(e) => setRepetir(e.target.checked)}
                         className="h-4 w-4 rounded border-base-border accent-accent"
                       />
-                      Repetir em vários meses (parcelado ou recorrente)
+                      {editandoId
+                        ? "Transformar em recorrência (criar parcelas futuras a partir desta data)"
+                        : "Repetir em vários meses (parcelado ou recorrente)"}
                     </label>
 
                     {repetir && (
