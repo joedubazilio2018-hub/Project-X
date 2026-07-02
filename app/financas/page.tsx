@@ -36,6 +36,26 @@ function formatarMoeda(valor: number): string {
   });
 }
 
+// Soma "meses" meses a uma data YYYY-MM-DD sem passar por Date->toISOString
+// (evita bug de fuso horário) e ajusta para o último dia do mês quando necessário
+// (ex: lançamento no dia 31 caindo em fevereiro).
+function adicionarMeses(dataISO: string, meses: number): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const totalMeses = mes - 1 + meses;
+  const novoAno = ano + Math.floor(totalMeses / 12);
+  const novoMesIndex = ((totalMeses % 12) + 12) % 12; // 0-indexado
+  const ultimoDiaDoMes = new Date(novoAno, novoMesIndex + 1, 0).getDate();
+  const novoDia = Math.min(dia, ultimoDiaDoMes);
+  const mesStr = String(novoMesIndex + 1).padStart(2, "0");
+  const diaStr = String(novoDia).padStart(2, "0");
+  return `${novoAno}-${mesStr}-${diaStr}`;
+}
+
+function formatarDataCurta(iso: string): string {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 export default function FinancasPage() {
   const supabase = createClient();
 
@@ -52,6 +72,10 @@ export default function FinancasPage() {
   const [data, setData] = useState(hojeISO());
   const [mostrarFormLancamento, setMostrarFormLancamento] = useState(false);
 
+  // Recorrência / parcelamento
+  const [repetir, setRepetir] = useState(false);
+  const [totalParcelas, setTotalParcelas] = useState("2");
+
   // Formulário de categoria
   const [novaCategoria, setNovaCategoria] = useState("");
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
@@ -60,6 +84,9 @@ export default function FinancasPage() {
   const [tituloMeta, setTituloMeta] = useState("");
   const [valorMeta, setValorMeta] = useState("");
   const [mostrarFormMeta, setMostrarFormMeta] = useState(false);
+
+  // Planejamento dos próximos meses
+  const [mesPlanejamentoAberto, setMesPlanejamentoAberto] = useState<string | null>(null);
 
   const [salvando, setSalvando] = useState(false);
 
@@ -97,29 +124,57 @@ export default function FinancasPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      setSalvando(false);
+      return;
+    }
 
-    await supabase.from("transactions").insert({
+    const qtdParcelas = repetir ? Math.max(2, parseInt(totalParcelas, 10) || 2) : 1;
+    const grupoId = qtdParcelas > 1 ? crypto.randomUUID() : null;
+
+    const linhas = Array.from({ length: qtdParcelas }).map((_, i) => ({
       user_id: userId,
       type: tipo,
       amount: valorNum,
       category_id: categoriaId || null,
       description: descricao.trim() || null,
-      date: data,
-    });
+      date: adicionarMeses(data, i),
+      recurrence_group_id: grupoId,
+      installment_number: qtdParcelas > 1 ? i + 1 : null,
+      installment_total: qtdParcelas > 1 ? qtdParcelas : null,
+    }));
+
+    await supabase.from("transactions").insert(linhas);
 
     setValor("");
     setDescricao("");
     setCategoriaId("");
     setData(hojeISO());
+    setRepetir(false);
+    setTotalParcelas("2");
     setMostrarFormLancamento(false);
     setSalvando(false);
     carregar();
   }
 
-  async function excluirLancamento(id: string) {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    await supabase.from("transactions").delete().eq("id", id);
+  async function excluirLancamento(t: Transaction) {
+    if (t.recurrence_group_id) {
+      const apagarTodas = window.confirm(
+        "Esse lançamento faz parte de uma recorrência/parcelamento. Clique OK para apagar TODAS as parcelas, ou Cancelar para apagar apenas esta parcela."
+      );
+      if (apagarTodas) {
+        setTransactions((prev) =>
+          prev.filter((tx) => tx.recurrence_group_id !== t.recurrence_group_id)
+        );
+        await supabase
+          .from("transactions")
+          .delete()
+          .eq("recurrence_group_id", t.recurrence_group_id);
+        return;
+      }
+    }
+    setTransactions((prev) => prev.filter((tx) => tx.id !== t.id));
+    await supabase.from("transactions").delete().eq("id", t.id);
   }
 
   // ── Categorias ──
@@ -197,6 +252,13 @@ export default function FinancasPage() {
     .filter((t) => t.type === "expense")
     .reduce((a, t) => a + t.amount, 0);
 
+  // Somente lançamentos até hoje entram no histórico da lista principal
+  // (parcelas futuras aparecem na seção de Planejamento)
+  const historicoLancamentos = useMemo(
+    () => transactions.filter((t) => t.date <= hojeISO()),
+    [transactions]
+  );
+
   // Dados pro gráfico de pizza (gastos por categoria, mês atual)
   const dadosPizza = useMemo(() => {
     const mapa: Record<string, { name: string; value: number; color: string }> = {};
@@ -242,6 +304,34 @@ export default function FinancasPage() {
         saldo: Number(saldoAcumulado.toFixed(2)),
       };
     });
+  }, [transactions]);
+
+  // Planejamento: próximos 6 meses (mês atual + 5 seguintes), incluindo parcelas futuras
+  const planejamento = useMemo(() => {
+    const meses: {
+      chave: string;
+      label: string;
+      receitas: number;
+      despesas: number;
+      itens: Transaction[];
+    }[] = [];
+    const hoje = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+      const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+      const itens = transactions
+        .filter((t) => t.date.startsWith(chave))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const receitas = itens
+        .filter((t) => t.type === "income")
+        .reduce((a, t) => a + t.amount, 0);
+      const despesas = itens
+        .filter((t) => t.type === "expense")
+        .reduce((a, t) => a + t.amount, 0);
+      meses.push({ chave, label, receitas, despesas, itens });
+    }
+    return meses;
   }, [transactions]);
 
   return (
@@ -503,7 +593,7 @@ export default function FinancasPage() {
           </section>
 
           {/* Lançamentos */}
-          <section>
+          <section className="mb-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Lançamentos</h2>
               <button
@@ -581,6 +671,36 @@ export default function FinancasPage() {
                   className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
 
+                {/* Recorrência / parcelamento */}
+                <div className="flex flex-col gap-2 rounded-lg border border-base-border bg-base p-3">
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      checked={repetir}
+                      onChange={(e) => setRepetir(e.target.checked)}
+                      className="h-4 w-4 rounded border-base-border accent-accent"
+                    />
+                    Repetir em vários meses (parcelado ou recorrente)
+                  </label>
+
+                  {repetir && (
+                    <div className="flex items-center gap-2 pl-6">
+                      <span className="text-xs text-ink-muted">Repetir por</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={36}
+                        value={totalParcelas}
+                        onChange={(e) => setTotalParcelas(e.target.value)}
+                        className="w-16 rounded-lg border border-base-border bg-base-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                      />
+                      <span className="text-xs text-ink-muted">
+                        meses (vai aparecer como 1/{totalParcelas || "?"}, 2/{totalParcelas || "?"}...)
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="submit"
                   disabled={salvando}
@@ -591,7 +711,7 @@ export default function FinancasPage() {
               </form>
             )}
 
-            {transactions.length === 0 ? (
+            {historicoLancamentos.length === 0 ? (
               <div className="rounded-xl border border-dashed border-base-border p-8 text-center">
                 <p className="text-sm text-ink-muted">
                   Você ainda não tem lançamentos.
@@ -599,13 +719,13 @@ export default function FinancasPage() {
               </div>
             ) : (
               <ul className="flex flex-col gap-2">
-                {transactions.slice(0, 30).map((t) => {
+                {historicoLancamentos.slice(0, 30).map((t) => {
                   const cat = categories.find((c) => c.id === t.category_id);
                   return (
                     <li key={t.id}>
                       <SwipeRow
                         onEdit={() => {}}
-                        onDelete={() => excluirLancamento(t.id)}
+                        onDelete={() => excluirLancamento(t)}
                       >
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -616,6 +736,11 @@ export default function FinancasPage() {
                             <div>
                               <p className="text-sm text-ink">
                                 {t.description || cat?.name || "Lançamento"}
+                                {t.installment_total ? (
+                                  <span className="ml-1.5 text-xs text-ink-faint">
+                                    ({t.installment_number}/{t.installment_total})
+                                  </span>
+                                ) : null}
                               </p>
                               <p className="text-xs text-ink-faint">
                                 {formatarDataCurta(t.date)}
@@ -639,13 +764,93 @@ export default function FinancasPage() {
               </ul>
             )}
           </section>
+
+          {/* Planejamento dos próximos meses */}
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-ink">
+              Planejamento dos próximos meses
+            </h2>
+            <div className="flex flex-col gap-2">
+              {planejamento.map((m) => {
+                const aberto = mesPlanejamentoAberto === m.chave;
+                const saldoMes = m.receitas - m.despesas;
+                return (
+                  <div
+                    key={m.chave}
+                    className="overflow-hidden rounded-xl border border-base-border bg-base-surface"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMesPlanejamentoAberto(aberto ? null : m.chave)
+                      }
+                      className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                      <span className="text-sm font-medium capitalize text-ink">
+                        {m.label}
+                      </span>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-accent">
+                          +{formatarMoeda(m.receitas)}
+                        </span>
+                        <span className="text-warn">
+                          −{formatarMoeda(m.despesas)}
+                        </span>
+                        <span
+                          className={`font-semibold ${
+                            saldoMes >= 0 ? "text-accent" : "text-warn"
+                          }`}
+                        >
+                          {formatarMoeda(saldoMes)}
+                        </span>
+                      </div>
+                    </button>
+                    {aberto && (
+                      <ul className="flex flex-col gap-1 border-t border-base-border px-4 py-2">
+                        {m.itens.length === 0 ? (
+                          <li className="py-2 text-xs text-ink-faint">
+                            Nenhum lançamento previsto para este mês.
+                          </li>
+                        ) : (
+                          m.itens.map((t) => {
+                            const cat = categories.find(
+                              (c) => c.id === t.category_id
+                            );
+                            return (
+                              <li
+                                key={t.id}
+                                className="flex items-center justify-between gap-2 py-1.5 text-xs"
+                              >
+                                <span className="text-ink-muted">
+                                  {formatarDataCurta(t.date)} ·{" "}
+                                  {t.description || cat?.name || "Lançamento"}
+                                  {t.installment_total
+                                    ? ` (${t.installment_number}/${t.installment_total})`
+                                    : ""}
+                                </span>
+                                <span
+                                  className={
+                                    t.type === "income"
+                                      ? "text-accent"
+                                      : "text-warn"
+                                  }
+                                >
+                                  {t.type === "income" ? "+" : "−"}
+                                  {formatarMoeda(t.amount)}
+                                </span>
+                              </li>
+                            );
+                          })
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </>
       )}
     </AppShell>
   );
-}
-
-function formatarDataCurta(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
