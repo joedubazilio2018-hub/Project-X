@@ -26,7 +26,11 @@ import type {
 const CORES_CATEGORIA = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
 
 function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
 }
 
 function formatarMoeda(valor: number): string {
@@ -54,6 +58,11 @@ function adicionarMeses(dataISO: string, meses: number): string {
 function formatarDataCurta(iso: string): string {
   const d = new Date(iso + "T12:00:00");
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// Considera atrasada uma despesa não paga cuja data já passou
+function estaAtrasada(t: Transaction): boolean {
+  return t.type === "expense" && !t.paid && t.date < hojeISO();
 }
 
 export default function FinancasPage() {
@@ -234,6 +243,14 @@ export default function FinancasPage() {
     await supabase.from("transactions").delete().eq("id", t.id);
   }
 
+  async function alternarPago(t: Transaction) {
+    const novoPago = !t.paid;
+    setTransactions((prev) =>
+      prev.map((tx) => (tx.id === t.id ? { ...tx, paid: novoPago } : tx))
+    );
+    await supabase.from("transactions").update({ paid: novoPago }).eq("id", t.id);
+  }
+
   // ── Categorias ──
   async function criarCategoria(e: React.FormEvent) {
     e.preventDefault();
@@ -316,6 +333,11 @@ export default function FinancasPage() {
     [transactions]
   );
 
+  const contasAtrasadas = useMemo(
+    () => historicoLancamentos.filter((t) => estaAtrasada(t)),
+    [historicoLancamentos]
+  );
+
   // Dados pro gráfico de pizza (gastos por categoria, mês atual)
   const dadosPizza = useMemo(() => {
     const mapa: Record<string, { name: string; value: number; color: string }> = {};
@@ -337,7 +359,10 @@ export default function FinancasPage() {
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      dias.push(d.toISOString().slice(0, 10));
+      const ano = d.getFullYear();
+      const mes = String(d.getMonth() + 1).padStart(2, "0");
+      const dia = String(d.getDate()).padStart(2, "0");
+      dias.push(`${ano}-${mes}-${dia}`);
     }
 
     const ordenadas = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
@@ -834,6 +859,13 @@ export default function FinancasPage() {
               </form>
             )}
 
+            {contasAtrasadas.length > 0 && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-warn/40 bg-warn-dim px-4 py-2.5 text-xs font-medium text-warn">
+                ⚠ Você tem {contasAtrasadas.length}{" "}
+                {contasAtrasadas.length > 1 ? "contas atrasadas" : "conta atrasada"}.
+              </div>
+            )}
+
             {historicoLancamentos.length === 0 ? (
               <div className="rounded-xl border border-dashed border-base-border p-8 text-center">
                 <p className="text-sm text-ink-muted">
@@ -852,8 +884,28 @@ export default function FinancasPage() {
                       >
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => alternarPago(t)}
+                              title={
+                                t.paid
+                                  ? "Marcar como pendente"
+                                  : t.type === "income"
+                                  ? "Marcar como recebido"
+                                  : "Marcar como pago"
+                              }
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold transition-colors ${
+                                t.paid
+                                  ? "border-accent bg-accent text-base"
+                                  : estaAtrasada(t)
+                                  ? "border-warn text-transparent hover:border-warn"
+                                  : "border-base-border text-transparent hover:border-accent"
+                              }`}
+                            >
+                              ✓
+                            </button>
                             <span
-                              className="h-2.5 w-2.5 rounded-full"
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
                               style={{ backgroundColor: cat?.color ?? "#5A6172" }}
                             />
                             <div>
@@ -862,6 +914,15 @@ export default function FinancasPage() {
                                 {t.installment_total ? (
                                   <span className="ml-1.5 text-xs text-ink-faint">
                                     ({t.installment_number}/{t.installment_total})
+                                  </span>
+                                ) : null}
+                                {t.paid ? (
+                                  <span className="ml-1.5 rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                                    {t.type === "income" ? "Recebido" : "Pago"}
+                                  </span>
+                                ) : estaAtrasada(t) ? (
+                                  <span className="ml-1.5 rounded-full bg-warn-dim px-1.5 py-0.5 text-[10px] font-medium text-warn">
+                                    Atrasada
                                   </span>
                                 ) : null}
                               </p>
@@ -944,13 +1005,24 @@ export default function FinancasPage() {
                                 key={t.id}
                                 className="flex items-center justify-between gap-2 py-1.5 text-xs"
                               >
-                                <span className="text-ink-muted">
-                                  {formatarDataCurta(t.date)} ·{" "}
-                                  {t.description || cat?.name || "Lançamento"}
-                                  {t.installment_total
-                                    ? ` (${t.installment_number}/${t.installment_total})`
-                                    : ""}
-                                </span>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-ink-muted">
+                                    {formatarDataCurta(t.date)} ·{" "}
+                                    {t.description || cat?.name || "Lançamento"}
+                                    {t.installment_total
+                                      ? ` (${t.installment_number}/${t.installment_total})`
+                                      : ""}
+                                  </span>
+                                  {t.paid ? (
+                                    <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                                      {t.type === "income" ? "Recebido" : "Pago"}
+                                    </span>
+                                  ) : estaAtrasada(t) ? (
+                                    <span className="rounded-full bg-warn-dim px-1.5 py-0.5 text-[10px] font-medium text-warn">
+                                      Atrasada
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <span
                                   className={
                                     t.type === "income"
