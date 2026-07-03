@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Note } from "@/types/database";
+import type { Note, NoteColor } from "@/types/database";
 import { CORES_NOTA } from "./NotaCard";
 
 type NotaModalProps = {
   note: Note | null; // null = criando uma nota nova
   onClose: () => void;
-  onSave: (dados: { title: string; content: string; color: string }) => void;
+  onSave: (dados: { title: string; content: string; color: NoteColor }) => void;
   onDelete: (id: string) => void;
   salvando: boolean;
 };
@@ -21,7 +21,7 @@ export default function NotaModal({
 }: NotaModalProps) {
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
-  const [color, setColor] = useState(note?.color ?? "default");
+  const [color, setColor] = useState<NoteColor>(note?.color ?? "default");
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
 
   function handleSalvar() {
@@ -67,20 +67,20 @@ export default function NotaModal({
         />
 
         <div className="mb-4 flex items-center gap-2">
-          {Object.entries(CORES_NOTA).map(([chave, hex]) => (
-            <button
-              key={chave}
-              type="button"
-              onClick={() => setColor(chave)}
-              aria-label={`Cor ${chave}`}
-              className="h-5 w-5 rounded-full transition-transform"
-              style={{
-                backgroundColor: hex,
-                outline: color === chave ? `2px solid ${hex}` : "none",
-                outlineOffset: 2,
-              }}
-            />
-          ))}
+{Object.entries(CORES_NOTA).map(([chave, hex]) => (
+  <button
+    key={chave}
+    type="button"
+    onClick={() => setColor(chave as NoteColor)}
+    aria-label={`Cor ${chave}`}
+    className="h-5 w-5 rounded-full transition-transform"
+    style={{
+      backgroundColor: hex,
+      outline: color === chave ? `2px solid ${hex}` : "none",
+      outlineOffset: 2,
+    }}
+  />
+))}
         </div>
 
         {confirmandoExclusao ? (
