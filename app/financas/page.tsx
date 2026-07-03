@@ -24,6 +24,7 @@ import type {
 } from "@/types/database";
 
 const CORES_CATEGORIA = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
+const LANCAMENTOS_POR_PAGINA = 50;
 
 function hojeISO(): string {
   const d = new Date();
@@ -40,14 +41,11 @@ function formatarMoeda(valor: number): string {
   });
 }
 
-// Soma "meses" meses a uma data YYYY-MM-DD sem passar por Date->toISOString
-// (evita bug de fuso horário) e ajusta para o último dia do mês quando necessário
-// (ex: lançamento no dia 31 caindo em fevereiro).
 function adicionarMeses(dataISO: string, meses: number): string {
   const [ano, mes, dia] = dataISO.split("-").map(Number);
   const totalMeses = mes - 1 + meses;
   const novoAno = ano + Math.floor(totalMeses / 12);
-  const novoMesIndex = ((totalMeses % 12) + 12) % 12; // 0-indexado
+  const novoMesIndex = ((totalMeses % 12) + 12) % 12;
   const ultimoDiaDoMes = new Date(novoAno, novoMesIndex + 1, 0).getDate();
   const novoDia = Math.min(dia, ultimoDiaDoMes);
   const mesStr = String(novoMesIndex + 1).padStart(2, "0");
@@ -60,7 +58,6 @@ function formatarDataCurta(iso: string): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-// Considera atrasada uma despesa não paga cuja data já passou
 function estaAtrasada(t: Transaction): boolean {
   return t.type === "expense" && !t.paid && t.date < hojeISO();
 }
@@ -72,8 +69,8 @@ export default function FinancasPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paginaAtual, setPaginaAtual] = useState(1);
 
-  // Formulário de lançamento
   const [tipo, setTipo] = useState<TransactionType>("expense");
   const [valor, setValor] = useState("");
   const [categoriaId, setCategoriaId] = useState<string>("");
@@ -81,25 +78,20 @@ export default function FinancasPage() {
   const [data, setData] = useState(hojeISO());
   const [mostrarFormLancamento, setMostrarFormLancamento] = useState(false);
 
-  // Recorrência / parcelamento
   const [repetir, setRepetir] = useState(false);
   const [totalParcelas, setTotalParcelas] = useState("2");
 
-  // Edição de lançamento existente
   const [editandoTransacao, setEditandoTransacao] = useState<Transaction | null>(null);
   const [aplicarEmTodasParcelas, setAplicarEmTodasParcelas] = useState(false);
   const editandoId = editandoTransacao?.id ?? null;
 
-  // Formulário de categoria
   const [novaCategoria, setNovaCategoria] = useState("");
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
 
-  // Formulário de meta financeira
   const [tituloMeta, setTituloMeta] = useState("");
   const [valorMeta, setValorMeta] = useState("");
   const [mostrarFormMeta, setMostrarFormMeta] = useState(false);
 
-  // Planejamento dos próximos meses
   const [mesPlanejamentoAberto, setMesPlanejamentoAberto] = useState<string | null>(null);
 
   const [salvando, setSalvando] = useState(false);
@@ -129,7 +121,6 @@ export default function FinancasPage() {
     carregar();
   }, [carregar]);
 
-  // ── Lançamentos ──
   function resetFormLancamento() {
     setValor("");
     setDescricao("");
@@ -164,7 +155,6 @@ export default function FinancasPage() {
     if (!valorNum || valorNum <= 0) return;
     setSalvando(true);
 
-    // ── Modo edição: atualiza o lançamento existente ──
     if (editandoTransacao) {
       const camposComuns = {
         type: tipo,
@@ -174,15 +164,11 @@ export default function FinancasPage() {
       };
 
       if (aplicarEmTodasParcelas && editandoTransacao.recurrence_group_id) {
-        // Atualiza valor/categoria/descrição/tipo em todas as parcelas do grupo,
-        // sem mexer na data individual de cada uma
         await supabase
           .from("transactions")
           .update(camposComuns)
           .eq("recurrence_group_id", editandoTransacao.recurrence_group_id);
       } else if (!editandoTransacao.recurrence_group_id && repetir) {
-        // Transforma um lançamento avulso em recorrência: este lançamento
-        // vira a parcela 1, e as parcelas seguintes são criadas a partir dele
         const qtdParcelas = Math.max(2, parseInt(totalParcelas, 10) || 2);
         const grupoId = crypto.randomUUID();
 
@@ -227,7 +213,6 @@ export default function FinancasPage() {
       return;
     }
 
-    // ── Modo criação: insere um ou vários (recorrência) ──
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) {
@@ -253,6 +238,7 @@ export default function FinancasPage() {
     await supabase.from("transactions").insert(linhas);
 
     resetFormLancamento();
+    setPaginaAtual(1);
     setSalvando(false);
     carregar();
   }
@@ -285,7 +271,6 @@ export default function FinancasPage() {
     await supabase.from("transactions").update({ paid: novoPago }).eq("id", t.id);
   }
 
-  // ── Categorias ──
   async function criarCategoria(e: React.FormEvent) {
     e.preventDefault();
     if (!novaCategoria.trim()) return;
@@ -314,7 +299,6 @@ export default function FinancasPage() {
     await supabase.from("categories").delete().eq("id", id);
   }
 
-  // ── Metas financeiras ──
   async function criarMetaFinanceira(e: React.FormEvent) {
     e.preventDefault();
     const valorNum = parseFloat(valorMeta.replace(",", "."));
@@ -344,7 +328,6 @@ export default function FinancasPage() {
     await supabase.from("financial_goals").delete().eq("id", id);
   }
 
-  // ── Cálculos derivados ──
   const saldoTotal = useMemo(() => {
     return transactions.reduce((acc, t) => {
       return t.type === "income" ? acc + t.amount : acc - t.amount;
@@ -360,8 +343,6 @@ export default function FinancasPage() {
     .filter((t) => t.type === "expense")
     .reduce((a, t) => a + t.amount, 0);
 
-  // Lançamentos do mês atual (mesmo os que ainda vão vencer) entram na lista
-  // principal; só os meses seguintes ficam exclusivos da seção de Planejamento
   const historicoLancamentos = useMemo(
     () => transactions.filter((t) => t.date.slice(0, 7) <= mesAtual),
     [transactions, mesAtual]
@@ -372,7 +353,11 @@ export default function FinancasPage() {
     [historicoLancamentos]
   );
 
-  // Dados pro gráfico de pizza (gastos por categoria, mês atual)
+  // Paginação: mostra LANCAMENTOS_POR_PAGINA por vez, com botão "Ver mais"
+  const totalExibidos = paginaAtual * LANCAMENTOS_POR_PAGINA;
+  const lancamentosVisiveis = historicoLancamentos.slice(0, totalExibidos);
+  const temMais = historicoLancamentos.length > totalExibidos;
+
   const dadosPizza = useMemo(() => {
     const mapa: Record<string, { name: string; value: number; color: string }> = {};
     transacoesMes
@@ -387,7 +372,6 @@ export default function FinancasPage() {
     return Object.values(mapa);
   }, [transacoesMes, categories]);
 
-  // Dados pro gráfico de linha (evolução do saldo, últimos 30 dias)
   const dadosLinha = useMemo(() => {
     const dias: string[] = [];
     for (let i = 29; i >= 0; i--) {
@@ -403,7 +387,6 @@ export default function FinancasPage() {
     let saldoAcumulado = 0;
     let idx = 0;
 
-    // soma tudo que aconteceu antes do início da janela de 30 dias
     while (idx < ordenadas.length && ordenadas[idx].date < dias[0]) {
       saldoAcumulado += ordenadas[idx].type === "income" ? ordenadas[idx].amount : -ordenadas[idx].amount;
       idx++;
@@ -422,7 +405,6 @@ export default function FinancasPage() {
     });
   }, [transactions]);
 
-  // Planejamento: próximos 6 meses (mês atual + 5 seguintes), incluindo parcelas futuras
   const planejamento = useMemo(() => {
     const meses: {
       chave: string;
@@ -467,11 +449,7 @@ export default function FinancasPage() {
           <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="rounded-xl border border-base-border bg-base-surface p-4">
               <p className="text-xs text-ink-muted">Saldo total</p>
-              <p
-                className={`mt-1 font-display text-xl font-bold ${
-                  saldoTotal >= 0 ? "text-accent" : "text-warn"
-                }`}
-              >
+              <p className={`mt-1 font-display text-xl font-bold ${saldoTotal >= 0 ? "text-accent" : "text-warn"}`}>
                 {formatarMoeda(saldoTotal)}
               </p>
             </div>
@@ -492,37 +470,20 @@ export default function FinancasPage() {
           {/* Gráficos */}
           <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-base-border bg-base-surface p-5">
-              <h2 className="mb-3 text-sm font-semibold text-ink">
-                Gastos por categoria (mês)
-              </h2>
+              <h2 className="mb-3 text-sm font-semibold text-ink">Gastos por categoria (mês)</h2>
               {dadosPizza.length === 0 ? (
-                <p className="py-8 text-center text-sm text-ink-muted">
-                  Sem despesas registradas neste mês.
-                </p>
+                <p className="py-8 text-center text-sm text-ink-muted">Sem despesas registradas neste mês.</p>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie
-                      data={dadosPizza}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name }) => name}
-                    >
+                    <Pie data={dadosPizza} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name }) => name}>
                       {dadosPizza.map((entry, idx) => (
                         <Cell key={idx} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip
                       formatter={(value: number) => formatarMoeda(value)}
-                      contentStyle={{
-                        backgroundColor: "#12161F",
-                        border: "1px solid #1F2530",
-                        borderRadius: 8,
-                        color: "#E7EAF0",
-                      }}
+                      contentStyle={{ backgroundColor: "#12161F", border: "1px solid #1F2530", borderRadius: 8, color: "#E7EAF0" }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -530,34 +491,17 @@ export default function FinancasPage() {
             </div>
 
             <div className="rounded-xl border border-base-border bg-base-surface p-5">
-              <h2 className="mb-3 text-sm font-semibold text-ink">
-                Evolução do saldo (30 dias)
-              </h2>
+              <h2 className="mb-3 text-sm font-semibold text-ink">Evolução do saldo (30 dias)</h2>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={dadosLinha}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1F2530" />
-                  <XAxis
-                    dataKey="dia"
-                    tick={{ fill: "#8B93A5", fontSize: 11 }}
-                    interval={4}
-                  />
+                  <XAxis dataKey="dia" tick={{ fill: "#8B93A5", fontSize: 11 }} interval={4} />
                   <YAxis tick={{ fill: "#8B93A5", fontSize: 11 }} width={50} />
                   <Tooltip
                     formatter={(value: number) => formatarMoeda(value)}
-                    contentStyle={{
-                      backgroundColor: "#12161F",
-                      border: "1px solid #1F2530",
-                      borderRadius: 8,
-                      color: "#E7EAF0",
-                    }}
+                    contentStyle={{ backgroundColor: "#12161F", border: "1px solid #1F2530", borderRadius: 8, color: "#E7EAF0" }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="saldo"
-                    stroke="#2DD4BF"
-                    strokeWidth={2}
-                    dot={false}
-                  />
+                  <Line type="monotone" dataKey="saldo" stroke="#2DD4BF" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -567,41 +511,16 @@ export default function FinancasPage() {
           <section className="mb-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Metas financeiras</h2>
-              <button
-                onClick={() => setMostrarFormMeta((v) => !v)}
-                className="text-xs font-medium text-accent hover:underline"
-              >
+              <button onClick={() => setMostrarFormMeta((v) => !v)} className="text-xs font-medium text-accent hover:underline">
                 {mostrarFormMeta ? "Cancelar" : "+ Nova meta"}
               </button>
             </div>
 
             {mostrarFormMeta && (
-              <form
-                onSubmit={criarMetaFinanceira}
-                className="mb-3 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-4 sm:flex-row sm:flex-wrap sm:items-center"
-              >
-                <input
-                  value={tituloMeta}
-                  onChange={(e) => setTituloMeta(e.target.value)}
-                  placeholder="Ex: Guardar por mês"
-                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:min-w-[180px] sm:flex-1"
-                  required
-                />
-                <input
-                  value={valorMeta}
-                  onChange={(e) => setValorMeta(e.target.value)}
-                  placeholder="Valor alvo (ex: 500)"
-                  inputMode="decimal"
-                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-40"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={salvando}
-                  className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto"
-                >
-                  Salvar
-                </button>
+              <form onSubmit={criarMetaFinanceira} className="mb-3 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-4 sm:flex-row sm:flex-wrap sm:items-center">
+                <input value={tituloMeta} onChange={(e) => setTituloMeta(e.target.value)} placeholder="Ex: Guardar por mês" className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:min-w-[180px] sm:flex-1" required />
+                <input value={valorMeta} onChange={(e) => setValorMeta(e.target.value)} placeholder="Valor alvo (ex: 500)" inputMode="decimal" className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-40" required />
+                <button type="submit" disabled={salvando} className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto">Salvar</button>
               </form>
             )}
 
@@ -610,37 +529,18 @@ export default function FinancasPage() {
             ) : (
               <ul className="flex flex-col gap-2">
                 {financialGoals.map((goal) => {
-                  const pct = Math.min(
-                    (goal.current_amount / goal.target_amount) * 100,
-                    100
-                  );
+                  const pct = Math.min((goal.current_amount / goal.target_amount) * 100, 100);
                   return (
-                    <li
-                      key={goal.id}
-                      className="group rounded-xl border border-base-border bg-base-surface p-4"
-                    >
+                    <li key={goal.id} className="group rounded-xl border border-base-border bg-base-surface p-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium text-ink">
-                          {goal.title}
-                        </span>
+                        <span className="text-sm font-medium text-ink">{goal.title}</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-ink-muted">
-                            {formatarMoeda(goal.current_amount)} /{" "}
-                            {formatarMoeda(goal.target_amount)}
-                          </span>
-                          <button
-                            onClick={() => excluirMetaFinanceira(goal.id)}
-                            className="hidden text-xs text-ink-faint transition-colors hover:text-warn group-hover:block"
-                          >
-                            Excluir
-                          </button>
+                          <span className="text-xs text-ink-muted">{formatarMoeda(goal.current_amount)} / {formatarMoeda(goal.target_amount)}</span>
+                          <button onClick={() => excluirMetaFinanceira(goal.id)} className="hidden text-xs text-ink-faint transition-colors hover:text-warn group-hover:block">Excluir</button>
                         </div>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-base">
-                        <div
-                          className="h-full rounded-full bg-accent transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
                       </div>
                     </li>
                   );
@@ -653,65 +553,41 @@ export default function FinancasPage() {
           <section className="mb-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Categorias</h2>
-              <button
-                onClick={() => setMostrarFormCategoria((v) => !v)}
-                className="text-xs font-medium text-accent hover:underline"
-              >
+              <button onClick={() => setMostrarFormCategoria((v) => !v)} className="text-xs font-medium text-accent hover:underline">
                 {mostrarFormCategoria ? "Cancelar" : "+ Nova categoria"}
               </button>
             </div>
 
             {mostrarFormCategoria && (
-              <form
-                onSubmit={criarCategoria}
-                className="mb-3 flex items-center gap-3 rounded-xl border border-base-border bg-base-surface p-4"
-              >
-                <input
-                  value={novaCategoria}
-                  onChange={(e) => setNovaCategoria(e.target.value)}
-                  placeholder="Ex: Alimentação"
-                  className="flex-1 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={salvando}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  Salvar
-                </button>
+              <form onSubmit={criarCategoria} className="mb-3 flex items-center gap-3 rounded-xl border border-base-border bg-base-surface p-4">
+                <input value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Ex: Alimentação" className="flex-1 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" required />
+                <button type="submit" disabled={salvando} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50">Salvar</button>
               </form>
             )}
 
             <div className="flex flex-wrap gap-2">
               {categories.map((cat) => (
-                <span
-                  key={cat.id}
-                  className="group flex items-center gap-1.5 rounded-full border border-base-border px-3 py-1.5 text-xs text-ink"
-                >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: cat.color }}
-                  />
+                <span key={cat.id} className="group flex items-center gap-1.5 rounded-full border border-base-border px-3 py-1.5 text-xs text-ink">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
                   {cat.name}
-                  <button
-                    onClick={() => excluirCategoria(cat.id)}
-                    className="hidden text-ink-faint hover:text-warn group-hover:inline"
-                  >
-                    ×
-                  </button>
+                  <button onClick={() => excluirCategoria(cat.id)} className="hidden text-ink-faint hover:text-warn group-hover:inline">×</button>
                 </span>
               ))}
-              {categories.length === 0 && (
-                <p className="text-sm text-ink-muted">Nenhuma categoria ainda.</p>
-              )}
+              {categories.length === 0 && <p className="text-sm text-ink-muted">Nenhuma categoria ainda.</p>}
             </div>
           </section>
 
           {/* Lançamentos */}
           <section className="mb-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-ink">Lançamentos</h2>
+              <h2 className="text-sm font-semibold text-ink">
+                Lançamentos
+                {historicoLancamentos.length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-ink-faint">
+                    ({historicoLancamentos.length} no total)
+                  </span>
+                )}
+              </h2>
               <button
                 onClick={() => {
                   if (mostrarFormLancamento) {
@@ -727,170 +603,70 @@ export default function FinancasPage() {
             </div>
 
             {mostrarFormLancamento && (
-              <form
-                onSubmit={salvarLancamento}
-                className="mb-4 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-5"
-              >
-                {editandoId && (
-                  <p className="text-xs font-medium text-accent">
-                    Editando lançamento existente
-                  </p>
-                )}
+              <form onSubmit={salvarLancamento} className="mb-4 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-5">
+                {editandoId && <p className="text-xs font-medium text-accent">Editando lançamento existente</p>}
 
                 {editandoTransacao?.recurrence_group_id && (
                   <div className="rounded-lg border border-accent/40 bg-accent-dim p-3 text-xs">
                     <p className="mb-2 font-medium text-ink">
-                      Essa parcela faz parte de uma recorrência (
-                      {editandoTransacao.installment_number}/
-                      {editandoTransacao.installment_total}). Deseja alterar
-                      apenas esta parcela ou todas as parcelas desse grupo?
+                      Essa parcela faz parte de uma recorrência ({editandoTransacao.installment_number}/{editandoTransacao.installment_total}). Deseja alterar apenas esta parcela ou todas?
                     </p>
                     <div className="flex flex-col gap-1.5">
                       <label className="flex items-center gap-2 text-ink-muted">
-                        <input
-                          type="radio"
-                          name="escopoEdicao"
-                          checked={!aplicarEmTodasParcelas}
-                          onChange={() => setAplicarEmTodasParcelas(false)}
-                          className="accent-accent"
-                        />
+                        <input type="radio" name="escopoEdicao" checked={!aplicarEmTodasParcelas} onChange={() => setAplicarEmTodasParcelas(false)} className="accent-accent" />
                         Somente esta parcela
                       </label>
                       <label className="flex items-center gap-2 text-ink-muted">
-                        <input
-                          type="radio"
-                          name="escopoEdicao"
-                          checked={aplicarEmTodasParcelas}
-                          onChange={() => setAplicarEmTodasParcelas(true)}
-                          className="accent-accent"
-                        />
-                        Todas as parcelas do grupo (valor, categoria, descrição
-                        e tipo — as datas de cada parcela não mudam)
+                        <input type="radio" name="escopoEdicao" checked={aplicarEmTodasParcelas} onChange={() => setAplicarEmTodasParcelas(true)} className="accent-accent" />
+                        Todas as parcelas do grupo (datas individuais não mudam)
                       </label>
                     </div>
                   </div>
                 )}
+
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTipo("expense")}
-                    className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${
-                      tipo === "expense"
-                        ? "border-warn bg-warn-dim text-warn"
-                        : "border-base-border text-ink-muted"
-                    }`}
-                  >
-                    Despesa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTipo("income")}
-                    className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${
-                      tipo === "income"
-                        ? "border-accent bg-accent-dim text-accent"
-                        : "border-base-border text-ink-muted"
-                    }`}
-                  >
-                    Receita
-                  </button>
+                  <button type="button" onClick={() => setTipo("expense")} className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${tipo === "expense" ? "border-warn bg-warn-dim text-warn" : "border-base-border text-ink-muted"}`}>Despesa</button>
+                  <button type="button" onClick={() => setTipo("income")} className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${tipo === "income" ? "border-accent bg-accent-dim text-accent" : "border-base-border text-ink-muted"}`}>Receita</button>
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <input
-                    value={valor}
-                    onChange={(e) => setValor(e.target.value)}
-                    placeholder="Valor (ex: 49,90)"
-                    inputMode="decimal"
-                    className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:flex-1"
-                    required
-                  />
+                  <input value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Valor (ex: 49,90)" inputMode="decimal" className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:flex-1" required />
                   <div className="flex flex-col gap-1">
-                    <input
-                      type="date"
-                      value={data}
-                      onChange={(e) => setData(e.target.value)}
-                      disabled={aplicarEmTodasParcelas}
-                      className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50"
-                    />
-                    {aplicarEmTodasParcelas && (
-                      <span className="text-xs text-ink-faint">
-                        Datas individuais não mudam
-                      </span>
-                    )}
+                    <input type="date" value={data} onChange={(e) => setData(e.target.value)} disabled={aplicarEmTodasParcelas} className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50" />
+                    {aplicarEmTodasParcelas && <span className="text-xs text-ink-faint">Datas individuais não mudam</span>}
                   </div>
                 </div>
 
-                <select
-                  value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                >
+                <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent">
                   <option value="">Sem categoria</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
+                  {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
 
-                <input
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                  placeholder="Descrição (opcional)"
-                  className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                />
+                <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" className="rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
 
-                {/* Recorrência / parcelamento — ao criar, ou ao editar um lançamento
-                    avulso que ainda não pertence a um grupo de recorrência */}
                 {(!editandoId || !editandoTransacao?.recurrence_group_id) && (
                   <div className="flex flex-col gap-2 rounded-lg border border-base-border bg-base p-3">
                     <label className="flex items-center gap-2 text-sm text-ink">
-                      <input
-                        type="checkbox"
-                        checked={repetir}
-                        onChange={(e) => setRepetir(e.target.checked)}
-                        className="h-4 w-4 rounded border-base-border accent-accent"
-                      />
-                      {editandoId
-                        ? "Transformar em recorrência (criar parcelas futuras a partir desta data)"
-                        : "Repetir em vários meses (parcelado ou recorrente)"}
+                      <input type="checkbox" checked={repetir} onChange={(e) => setRepetir(e.target.checked)} className="h-4 w-4 rounded border-base-border accent-accent" />
+                      {editandoId ? "Transformar em recorrência" : "Repetir em vários meses (parcelado ou recorrente)"}
                     </label>
 
                     {repetir && (
                       <div className="flex items-center gap-2 pl-6">
                         <span className="text-xs text-ink-muted">Repetir por</span>
-                        <input
-                          type="number"
-                          min={2}
-                          max={36}
-                          value={totalParcelas}
-                          onChange={(e) => setTotalParcelas(e.target.value)}
-                          className="w-16 rounded-lg border border-base-border bg-base-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                        />
-                        <span className="text-xs text-ink-muted">
-                          meses (vai aparecer como 1/{totalParcelas || "?"}, 2/{totalParcelas || "?"}...)
-                        </span>
+                        <input type="number" min={2} max={60} value={totalParcelas} onChange={(e) => setTotalParcelas(e.target.value)} className="w-16 rounded-lg border border-base-border bg-base-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
+                        <span className="text-xs text-ink-muted">meses (1/{totalParcelas || "?"}, 2/{totalParcelas || "?"}...)</span>
                       </div>
                     )}
                   </div>
                 )}
 
                 <div className="flex items-center gap-3">
-                  <button
-                    type="submit"
-                    disabled={salvando}
-                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
-                  >
+                  <button type="submit" disabled={salvando} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50">
                     {editandoId ? "Salvar alterações" : "Salvar lançamento"}
                   </button>
                   {editandoId && (
-                    <button
-                      type="button"
-                      onClick={cancelarEdicao}
-                      className="text-sm font-medium text-ink-muted hover:text-ink"
-                    >
-                      Cancelar edição
-                    </button>
+                    <button type="button" onClick={cancelarEdicao} className="text-sm font-medium text-ink-muted hover:text-ink">Cancelar edição</button>
                   )}
                 </div>
               </form>
@@ -898,177 +674,111 @@ export default function FinancasPage() {
 
             {contasAtrasadas.length > 0 && (
               <div className="mb-3 flex items-center gap-2 rounded-lg border border-warn/40 bg-warn-dim px-4 py-2.5 text-xs font-medium text-warn">
-                ⚠ Você tem {contasAtrasadas.length}{" "}
-                {contasAtrasadas.length > 1 ? "contas atrasadas" : "conta atrasada"}.
+                ⚠ Você tem {contasAtrasadas.length} {contasAtrasadas.length > 1 ? "contas atrasadas" : "conta atrasada"}.
               </div>
             )}
 
             {historicoLancamentos.length === 0 ? (
               <div className="rounded-xl border border-dashed border-base-border p-8 text-center">
-                <p className="text-sm text-ink-muted">
-                  Você ainda não tem lançamentos.
-                </p>
+                <p className="text-sm text-ink-muted">Você ainda não tem lançamentos.</p>
               </div>
             ) : (
-              <ul className="flex flex-col gap-2">
-                {historicoLancamentos.slice(0, 30).map((t) => {
-                  const cat = categories.find((c) => c.id === t.category_id);
-                  return (
-                    <li key={t.id}>
-                      <SwipeRow
-                        onEdit={() => iniciarEdicao(t)}
-                        onDelete={() => excluirLancamento(t)}
-                      >
-                        <div className="flex items-center justify-between px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => alternarPago(t)}
-                              title={
-                                t.paid
-                                  ? "Marcar como pendente"
-                                  : t.type === "income"
-                                  ? "Marcar como recebido"
-                                  : "Marcar como pago"
-                              }
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold transition-colors ${
-                                t.paid
-                                  ? "border-accent bg-accent text-base"
-                                  : estaAtrasada(t)
-                                  ? "border-warn text-transparent hover:border-warn"
-                                  : "border-base-border text-transparent hover:border-accent"
-                              }`}
-                            >
-                              ✓
-                            </button>
-                            <span
-                              className="h-2.5 w-2.5 shrink-0 rounded-full"
-                              style={{ backgroundColor: cat?.color ?? "#5A6172" }}
-                            />
-                            <div>
-                              <p className="text-sm text-ink">
-                                {t.description || cat?.name || "Lançamento"}
-                                {t.installment_total ? (
-                                  <span className="ml-1.5 text-xs text-ink-faint">
-                                    ({t.installment_number}/{t.installment_total})
-                                  </span>
-                                ) : null}
-                                {t.paid ? (
-                                  <span className="ml-1.5 rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                                    {t.type === "income" ? "Recebido" : "Pago"}
-                                  </span>
-                                ) : estaAtrasada(t) ? (
-                                  <span className="ml-1.5 rounded-full bg-warn-dim px-1.5 py-0.5 text-[10px] font-medium text-warn">
-                                    Atrasada
-                                  </span>
-                                ) : null}
-                              </p>
-                              <p className="text-xs text-ink-faint">
-                                {formatarDataCurta(t.date)}
-                                {cat ? ` · ${cat.name}` : ""}
-                              </p>
+              <>
+                <ul className="flex flex-col gap-2">
+                  {lancamentosVisiveis.map((t) => {
+                    const cat = categories.find((c) => c.id === t.category_id);
+                    return (
+                      <li key={t.id}>
+                        <SwipeRow onEdit={() => iniciarEdicao(t)} onDelete={() => excluirLancamento(t)}>
+                          <div className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => alternarPago(t)}
+                                title={t.paid ? "Marcar como pendente" : t.type === "income" ? "Marcar como recebido" : "Marcar como pago"}
+                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold transition-colors ${t.paid ? "border-accent bg-accent text-base" : estaAtrasada(t) ? "border-warn text-transparent hover:border-warn" : "border-base-border text-transparent hover:border-accent"}`}
+                              >
+                                ✓
+                              </button>
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: cat?.color ?? "#5A6172" }} />
+                              <div>
+                                <p className="text-sm text-ink">
+                                  {t.description || cat?.name || "Lançamento"}
+                                  {t.installment_total ? (
+                                    <span className="ml-1.5 text-xs text-ink-faint">({t.installment_number}/{t.installment_total})</span>
+                                  ) : null}
+                                  {t.paid ? (
+                                    <span className="ml-1.5 rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">{t.type === "income" ? "Recebido" : "Pago"}</span>
+                                  ) : estaAtrasada(t) ? (
+                                    <span className="ml-1.5 rounded-full bg-warn-dim px-1.5 py-0.5 text-[10px] font-medium text-warn">Atrasada</span>
+                                  ) : null}
+                                </p>
+                                <p className="text-xs text-ink-faint">
+                                  {formatarDataCurta(t.date)}{cat ? ` · ${cat.name}` : ""}
+                                </p>
+                              </div>
                             </div>
+                            <span className={`text-sm font-semibold ${t.type === "income" ? "text-accent" : "text-warn"}`}>
+                              {t.type === "income" ? "+" : "−"}{formatarMoeda(t.amount)}
+                            </span>
                           </div>
-                          <span
-                            className={`text-sm font-semibold ${
-                              t.type === "income" ? "text-accent" : "text-warn"
-                            }`}
-                          >
-                            {t.type === "income" ? "+" : "−"}
-                            {formatarMoeda(t.amount)}
-                          </span>
-                        </div>
-                      </SwipeRow>
-                    </li>
-                  );
-                })}
-              </ul>
+                        </SwipeRow>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {temMais && (
+                  <button
+                    onClick={() => setPaginaAtual((p) => p + 1)}
+                    className="mt-3 w-full rounded-lg border border-base-border py-2.5 text-sm font-medium text-ink-muted transition-colors hover:border-accent hover:text-accent"
+                  >
+                    Ver mais ({historicoLancamentos.length - totalExibidos} restantes)
+                  </button>
+                )}
+              </>
             )}
           </section>
 
           {/* Planejamento dos próximos meses */}
           <section>
-            <h2 className="mb-3 text-sm font-semibold text-ink">
-              Planejamento dos próximos meses
-            </h2>
+            <h2 className="mb-3 text-sm font-semibold text-ink">Planejamento dos próximos meses</h2>
             <div className="flex flex-col gap-2">
               {planejamento.map((m) => {
                 const aberto = mesPlanejamentoAberto === m.chave;
                 const saldoMes = m.receitas - m.despesas;
                 return (
-                  <div
-                    key={m.chave}
-                    className="overflow-hidden rounded-xl border border-base-border bg-base-surface"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMesPlanejamentoAberto(aberto ? null : m.chave)
-                      }
-                      className="flex w-full items-center justify-between px-4 py-3 text-left"
-                    >
-                      <span className="text-sm font-medium capitalize text-ink">
-                        {m.label}
-                      </span>
+                  <div key={m.chave} className="overflow-hidden rounded-xl border border-base-border bg-base-surface">
+                    <button type="button" onClick={() => setMesPlanejamentoAberto(aberto ? null : m.chave)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+                      <span className="text-sm font-medium capitalize text-ink">{m.label}</span>
                       <div className="flex items-center gap-3 text-xs">
-                        <span className="text-accent">
-                          +{formatarMoeda(m.receitas)}
-                        </span>
-                        <span className="text-warn">
-                          −{formatarMoeda(m.despesas)}
-                        </span>
-                        <span
-                          className={`font-semibold ${
-                            saldoMes >= 0 ? "text-accent" : "text-warn"
-                          }`}
-                        >
-                          {formatarMoeda(saldoMes)}
-                        </span>
+                        <span className="text-accent">+{formatarMoeda(m.receitas)}</span>
+                        <span className="text-warn">−{formatarMoeda(m.despesas)}</span>
+                        <span className={`font-semibold ${saldoMes >= 0 ? "text-accent" : "text-warn"}`}>{formatarMoeda(saldoMes)}</span>
                       </div>
                     </button>
                     {aberto && (
                       <ul className="flex flex-col gap-1 border-t border-base-border px-4 py-2">
                         {m.itens.length === 0 ? (
-                          <li className="py-2 text-xs text-ink-faint">
-                            Nenhum lançamento previsto para este mês.
-                          </li>
+                          <li className="py-2 text-xs text-ink-faint">Nenhum lançamento previsto para este mês.</li>
                         ) : (
                           m.itens.map((t) => {
-                            const cat = categories.find(
-                              (c) => c.id === t.category_id
-                            );
+                            const cat = categories.find((c) => c.id === t.category_id);
                             return (
-                              <li
-                                key={t.id}
-                                className="flex items-center justify-between gap-2 py-1.5 text-xs"
-                              >
+                              <li key={t.id} className="flex items-center justify-between gap-2 py-1.5 text-xs">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-ink-muted">
-                                    {formatarDataCurta(t.date)} ·{" "}
-                                    {t.description || cat?.name || "Lançamento"}
-                                    {t.installment_total
-                                      ? ` (${t.installment_number}/${t.installment_total})`
-                                      : ""}
+                                    {formatarDataCurta(t.date)} · {t.description || cat?.name || "Lançamento"}
+                                    {t.installment_total ? ` (${t.installment_number}/${t.installment_total})` : ""}
                                   </span>
                                   {t.paid ? (
-                                    <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                                      {t.type === "income" ? "Recebido" : "Pago"}
-                                    </span>
+                                    <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">{t.type === "income" ? "Recebido" : "Pago"}</span>
                                   ) : estaAtrasada(t) ? (
-                                    <span className="rounded-full bg-warn-dim px-1.5 py-0.5 text-[10px] font-medium text-warn">
-                                      Atrasada
-                                    </span>
+                                    <span className="rounded-full bg-warn-dim px-1.5 py-0.5 text-[10px] font-medium text-warn">Atrasada</span>
                                   ) : null}
                                 </div>
-                                <span
-                                  className={
-                                    t.type === "income"
-                                      ? "text-accent"
-                                      : "text-warn"
-                                  }
-                                >
-                                  {t.type === "income" ? "+" : "−"}
-                                  {formatarMoeda(t.amount)}
+                                <span className={t.type === "income" ? "text-accent" : "text-warn"}>
+                                  {t.type === "income" ? "+" : "−"}{formatarMoeda(t.amount)}
                                 </span>
                               </li>
                             );
