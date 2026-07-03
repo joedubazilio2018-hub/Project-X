@@ -328,13 +328,21 @@ export default function FinancasPage() {
     await supabase.from("financial_goals").delete().eq("id", id);
   }
 
-  const saldoTotal = useMemo(() => {
-    return transactions.reduce((acc, t) => {
-      return t.type === "income" ? acc + t.amount : acc - t.amount;
-    }, 0);
-  }, [transactions]);
-
+  // ── Cálculos derivados ──
   const mesAtual = hojeISO().slice(0, 7);
+
+  // Saldo devedor: soma das despesas AINDA NÃO PAGAS com competência até o mês
+  // atual (inclui atrasadas de meses anteriores que ficaram pra trás). Diminui
+  // conforme você marca contas como pagas, e sobe de novo quando vira o mês e
+  // entram as contas novas.
+  const saldoDevedor = useMemo(() => {
+    return transactions
+      .filter(
+        (t) => t.type === "expense" && !t.paid && t.date.slice(0, 7) <= mesAtual
+      )
+      .reduce((acc, t) => acc + t.amount, 0);
+  }, [transactions, mesAtual]);
+
   const transacoesMes = transactions.filter((t) => t.date.startsWith(mesAtual));
   const receitasMes = transacoesMes
     .filter((t) => t.type === "income")
@@ -448,9 +456,16 @@ export default function FinancasPage() {
           {/* Cards de resumo */}
           <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="rounded-xl border border-base-border bg-base-surface p-4">
-              <p className="text-xs text-ink-muted">Saldo total</p>
-              <p className={`mt-1 font-display text-xl font-bold ${saldoTotal >= 0 ? "text-accent" : "text-warn"}`}>
-                {formatarMoeda(saldoTotal)}
+              <p className="text-xs text-ink-muted">Saldo devedor</p>
+              <p
+                className={`mt-1 font-display text-xl font-bold ${
+                  saldoDevedor > 0 ? "text-warn" : "text-accent"
+                }`}
+              >
+                {formatarMoeda(saldoDevedor)}
+              </p>
+              <p className="mt-0.5 text-[10px] text-ink-faint">
+                Contas do mês + atrasadas, ainda não pagas
               </p>
             </div>
             <div className="rounded-xl border border-base-border bg-base-surface p-4">
