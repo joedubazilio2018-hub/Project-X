@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import NotaCard from "@/components/NotaCard";
 import NotaModal from "@/components/NotaModal";
-import type { Note } from "@/types/database";
+import type { Note, NoteColor } from "@/types/database";
 
 export default function NotasPage() {
   const supabase = createClient();
@@ -47,7 +47,7 @@ export default function NotasPage() {
     setNotaSelecionada(null);
   }
 
-  async function salvarNota(dados: { title: string; content: string; color: string }) {
+  async function salvarNota(dados: { title: string; content: string; color: NoteColor }) {
     setSalvando(true);
 
     if (notaSelecionada) {
