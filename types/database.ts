@@ -87,3 +87,14 @@ export type FinancialGoal = {
   deadline: string | null;
   created_at: string;
 };
+export type NoteColor = "default" | "teal" | "amber" | "coral" | "blue" | "purple";
+export type Note = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  content: string | null;
+  color: NoteColor;
+  pinned: boolean;
+  created_at: string;
+  updated_at: string;
+};
