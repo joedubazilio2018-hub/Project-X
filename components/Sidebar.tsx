@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/metas", label: "Metas" },
   { href: "/diario", label: "Diário" },
   { href: "/financas", label: "Finanças" },
+  { href: "/notas", label: "Notas" }, // ← adicione esta linha
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
