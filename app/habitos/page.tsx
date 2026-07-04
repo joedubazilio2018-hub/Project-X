@@ -10,7 +10,11 @@ import type { Habit, HabitLog, HabitCategory } from "@/types/database";
 const CORES = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
 
 function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
 }
 
 export default function HabitosPage() {
