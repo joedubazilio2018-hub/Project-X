@@ -15,8 +15,15 @@ type EventoTimeline = {
   cor: string;
 };
 
+function paraISOLocal(d: Date): string {
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
 function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return paraISOLocal(new Date());
 }
 
 function ultimosNDias(n: number): string[] {
@@ -24,7 +31,7 @@ function ultimosNDias(n: number): string[] {
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    dias.push(d.toISOString().slice(0, 10));
+    dias.push(paraISOLocal(d));
   }
   return dias;
 }
@@ -116,7 +123,7 @@ export default function DashboardPage() {
     );
     let cursor = new Date();
     while (true) {
-      const iso = cursor.toISOString().slice(0, 10);
+      const iso = paraISOLocal(cursor);
       if (datasComLog.has(iso)) {
         streak++;
         cursor.setDate(cursor.getDate() - 1);
@@ -332,7 +339,7 @@ export default function DashboardPage() {
     if (iso === hoje) return "Hoje";
     const ontem = new Date();
     ontem.setDate(ontem.getDate() - 1);
-    if (iso === ontem.toISOString().slice(0, 10)) return "Ontem";
+    if (iso === paraISOLocal(ontem)) return "Ontem";
     return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   }
 
