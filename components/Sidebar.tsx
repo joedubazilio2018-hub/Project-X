@@ -2,23 +2,30 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 
-const NAV_ITEMS = [
+const NAV_ITEMS_BASE = [
   { href: "/", label: "Painel" },
   { href: "/habitos", label: "Hábitos" },
   { href: "/metas", label: "Metas" },
   { href: "/diario", label: "Diário" },
   { href: "/financas", label: "Finanças" },
-  { href: "/notas", label: "Notas" }, // ← adicione esta linha
 ];
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+const ITEM_ADMIN = { href: "/admin", label: "Admin" };
+
+function NavLinks({
+  items,
+  onNavigate,
+}: {
+  items: { href: string; label: string }[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-1 flex-col gap-1">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href;
         return (
           <Link
@@ -43,6 +50,18 @@ export default function Sidebar() {
   const router = useRouter();
   const supabase = createClient();
   const [aberto, setAberto] = useState(false);
+  const [souAdmin, setSouAdmin] = useState(false);
+
+  useEffect(() => {
+    // Verifica silenciosamente se o usuário logado é administrador.
+    // Só ele vê o link extra "Admin" — para qualquer outra pessoa, isto
+    // retorna false e o link nunca aparece.
+    supabase.rpc("is_admin").then(({ data, error }) => {
+      if (!error && data === true) setSouAdmin(true);
+    });
+  }, [supabase]);
+
+  const navItems = souAdmin ? [...NAV_ITEMS_BASE, ITEM_ADMIN] : NAV_ITEMS_BASE;
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -86,7 +105,7 @@ export default function Sidebar() {
           </h1>
           <p className="mt-0.5 text-xs text-ink-faint">by JB Group</p>
         </div>
-        <NavLinks />
+        <NavLinks items={navItems} />
         <button
           onClick={handleSignOut}
           className="rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-faint transition-colors hover:bg-base hover:text-warn"
@@ -121,7 +140,7 @@ export default function Sidebar() {
                 ✕
               </button>
             </div>
-            <NavLinks onNavigate={() => setAberto(false)} />
+            <NavLinks items={navItems} onNavigate={() => setAberto(false)} />
             <button
               onClick={handleSignOut}
               className="rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-faint transition-colors hover:bg-base hover:text-warn"
