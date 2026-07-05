@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [codigoConvite, setCodigoConvite] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +38,25 @@ export default function LoginPage() {
         router.refresh();
       }
     } else {
+      // Valida o código de convite ANTES de criar a conta
+      const codigoLimpo = codigoConvite.trim();
+
+      const { data: codigoValido, error: erroValidacao } = await supabase.rpc(
+        "validar_codigo_convite",
+        { p_code: codigoLimpo }
+      );
+
+      if (erroValidacao || !codigoValido) {
+        setError("Código de convite inválido, expirado ou já utilizado.");
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { nome: nome.trim() },
+          data: { nome: nome.trim(), invite_code: codigoLimpo },
           emailRedirectTo:
             typeof window !== "undefined"
               ? `${window.location.origin}/login`
@@ -191,6 +206,23 @@ export default function LoginPage() {
                 placeholder="••••••••"
               />
             </div>
+
+            {mode === "signup" && (
+              <div>
+                <label htmlFor="codigo" className="mb-1.5 block text-sm text-ink-muted">
+                  Código de convite
+                </label>
+                <input
+                  id="codigo"
+                  type="text"
+                  required
+                  value={codigoConvite}
+                  onChange={(e) => setCodigoConvite(e.target.value)}
+                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                  placeholder="Cole aqui o código recebido"
+                />
+              </div>
+            )}
 
             {error && (
               <p className="rounded-lg bg-warn-dim px-3 py-2 text-sm text-warn">
