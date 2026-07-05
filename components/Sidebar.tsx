@@ -107,6 +107,12 @@ export default function Sidebar() {
           <p className="mt-0.5 text-xs text-ink-faint">by JB Group</p>
         </div>
         <NavLinks items={navItems} />
+        <Link
+          href="/perfil"
+          className="rounded-lg px-3 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-base hover:text-ink"
+        >
+          Editar perfil
+        </Link>
         <button
           onClick={handleSignOut}
           className="rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-faint transition-colors hover:bg-base hover:text-warn"
@@ -142,6 +148,13 @@ export default function Sidebar() {
               </button>
             </div>
             <NavLinks items={navItems} onNavigate={() => setAberto(false)} />
+            <Link
+              href="/perfil"
+              onClick={() => setAberto(false)}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-base hover:text-ink"
+            >
+              Editar perfil
+            </Link>
             <button
               onClick={handleSignOut}
               className="rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-faint transition-colors hover:bg-base hover:text-warn"
