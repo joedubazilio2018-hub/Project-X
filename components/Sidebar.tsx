@@ -11,6 +11,7 @@ const NAV_ITEMS_BASE = [
   { href: "/metas", label: "Metas" },
   { href: "/diario", label: "Diário" },
   { href: "/financas", label: "Finanças" },
+  { href: "/notas", label: "Notas" },
 ];
 
 const ITEM_ADMIN = { href: "/admin", label: "Admin" };
