@@ -7,11 +7,13 @@ import { createClient } from "@/lib/supabase-browser";
 const NAV_ITEMS_BASE = [
   { href: "/", label: "Painel" },
   { href: "/habitos", label: "Hábitos" },
+  { href: "/tarefas", label: "Tarefas" },
   { href: "/metas", label: "Metas" },
   { href: "/diario", label: "Diário" },
   { href: "/financas", label: "Finanças" },
   { href: "/notas", label: "Notas" },
 ];
+
 
 const ITEM_ADMIN = { href: "/admin", label: "Admin" };
 
