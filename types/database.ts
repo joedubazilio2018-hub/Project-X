@@ -96,6 +96,15 @@ export type FinancialGoal = {
   deadline: string | null;
   created_at: string;
 };
+export type Task = {
+  id: string;
+  user_id: string;
+  title: string;
+  due_date: string | null; // YYYY-MM-DD, null = sem prazo
+  done: boolean;
+  completed_at: string | null;
+  created_at: string;
+};
 export type NoteColor = "default" | "teal" | "amber" | "coral" | "blue" | "purple";
 export type Note = {
   id: string;
