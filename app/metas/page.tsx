@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
-import type { Goal, GoalStatus, GoalCategory } from "@/types/database";
+import type { Goal, GoalStatus, GoalCategory, GoalItem } from "@/types/database";
 
 const CORES = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
 
@@ -26,8 +26,15 @@ export default function MetasPage() {
   const supabase = createClient();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [categories, setCategories] = useState<GoalCategory[]>([]);
+  const [items, setItems] = useState<GoalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+
+  // Novo item por meta (um campo de texto por card de meta)
+  const [novoItemTexto, setNovoItemTexto] = useState<Record<string, string>>({});
+
+  // Itens da nova meta (um por linha, no formulário de criação)
+  const [itensNovaMeta, setItensNovaMeta] = useState("");
 
   // Form de nova meta
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -59,9 +66,14 @@ export default function MetasPage() {
       .from("goal_categories")
       .select("*")
       .order("created_at", { ascending: true });
+    const { data: goalItems } = await supabase
+      .from("goal_items")
+      .select("*")
+      .order("position", { ascending: true });
 
     setGoals((data as Goal[]) ?? []);
     setCategories((cats as GoalCategory[]) ?? []);
+    setItems((goalItems as GoalItem[]) ?? []);
     setLoading(false);
   }, [supabase]);
 
@@ -79,22 +91,92 @@ export default function MetasPage() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    await supabase.from("goals").insert({
-      user_id: userId,
-      title: titulo.trim(),
-      description: descricao.trim() || null,
-      deadline: prazo || null,
-      category_id: categoriaId || null,
-      status: "not_started",
-    });
+    const { data: novaMeta } = await supabase
+      .from("goals")
+      .insert({
+        user_id: userId,
+        title: titulo.trim(),
+        description: descricao.trim() || null,
+        deadline: prazo || null,
+        category_id: categoriaId || null,
+        status: "not_started",
+      })
+      .select()
+      .single();
+
+    const linhas = itensNovaMeta
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    if (novaMeta && linhas.length > 0) {
+      await supabase.from("goal_items").insert(
+        linhas.map((content, i) => ({
+          goal_id: novaMeta.id,
+          user_id: userId,
+          content,
+          position: i,
+        }))
+      );
+    }
 
     setTitulo("");
     setDescricao("");
     setPrazo("");
     setCategoriaId("");
+    setItensNovaMeta("");
     setMostrarForm(false);
     setSalvando(false);
     carregar();
+  }
+
+  // ── Itens (tópicos) de uma meta ──
+  async function adicionarItem(goalId: string) {
+    const texto = (novoItemTexto[goalId] || "").trim();
+    if (!texto) return;
+
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    const itensDaMeta = items.filter((i) => i.goal_id === goalId);
+    const proximaPosicao = itensDaMeta.length;
+
+    await supabase.from("goal_items").insert({
+      goal_id: goalId,
+      user_id: userId,
+      content: texto,
+      position: proximaPosicao,
+    });
+
+    setNovoItemTexto((prev) => ({ ...prev, [goalId]: "" }));
+    carregar();
+  }
+
+  async function alternarItem(item: GoalItem) {
+    const novoDone = !item.done;
+    const novosItems = items.map((i) =>
+      i.id === item.id ? { ...i, done: novoDone } : i
+    );
+    setItems(novosItems);
+    await supabase.from("goal_items").update({ done: novoDone }).eq("id", item.id);
+
+    // Auto-completa (ou reabre) a meta quando todos os itens são marcados/desmarcados
+    const itensDaMeta = novosItems.filter((i) => i.goal_id === item.goal_id);
+    const meta = goals.find((g) => g.id === item.goal_id);
+    if (itensDaMeta.length > 0 && meta) {
+      const todosFeitos = itensDaMeta.every((i) => i.done);
+      if (todosFeitos && meta.status !== "done") {
+        mudarStatus(item.goal_id, "done");
+      } else if (!todosFeitos && meta.status === "done") {
+        mudarStatus(item.goal_id, "in_progress");
+      }
+    }
+  }
+
+  async function excluirItem(item: GoalItem) {
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    await supabase.from("goal_items").delete().eq("id", item.id);
   }
 
   function iniciarEdicao(goal: Goal) {
@@ -316,6 +398,13 @@ export default function MetasPage() {
             rows={3}
             className="resize-none rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
+          <textarea
+            value={itensNovaMeta}
+            onChange={(e) => setItensNovaMeta(e.target.value)}
+            placeholder={"Tópicos/tarefas (opcional) — um por linha, ex:\nLavar louça\nTrocar óleo da moto\nLavar o quintal"}
+            rows={3}
+            className="resize-none rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+          />
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm text-ink-muted">Prazo (opcional):</label>
             <input
@@ -457,6 +546,70 @@ export default function MetasPage() {
                           Prazo: {formatarData(goal.deadline)}
                         </p>
                       )}
+
+                      {/* Checklist de tópicos/tarefas da meta */}
+                      {(() => {
+                        const itensDaMeta = items
+                          .filter((i) => i.goal_id === goal.id)
+                          .sort((a, b) => a.position - b.position);
+                        return (
+                          <div className="mt-3 flex flex-col gap-1.5">
+                            {itensDaMeta.map((item) => (
+                              <div
+                                key={item.id}
+                                className="group flex items-center gap-2"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => alternarItem(item)}
+                                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold ${
+                                    item.done
+                                      ? "border-accent bg-accent text-base"
+                                      : "border-base-border text-transparent hover:border-accent"
+                                  }`}
+                                >
+                                  ✓
+                                </button>
+                                <span
+                                  className={`flex-1 text-sm ${
+                                    item.done
+                                      ? "text-ink-faint line-through"
+                                      : "text-ink-muted"
+                                  }`}
+                                >
+                                  {item.content}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => excluirItem(item)}
+                                  className="hidden text-xs text-ink-faint hover:text-warn group-hover:inline"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                            <div className="mt-1 flex items-center gap-2">
+                              <input
+                                value={novoItemTexto[goal.id] || ""}
+                                onChange={(e) =>
+                                  setNovoItemTexto((prev) => ({
+                                    ...prev,
+                                    [goal.id]: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    adicionarItem(goal.id);
+                                  }
+                                }}
+                                placeholder="+ Adicionar tópico"
+                                className="flex-1 rounded-lg border border-transparent bg-transparent px-1 py-1 text-xs text-ink outline-none focus:border-base-border"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="mt-3 flex gap-1.5">
