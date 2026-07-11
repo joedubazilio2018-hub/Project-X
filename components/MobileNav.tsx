@@ -8,14 +8,16 @@ import { createClient } from "@/lib/supabase-browser";
 const ABAS_PRINCIPAIS = [
   { href: "/", label: "Painel", icon: IconePainel },
   { href: "/habitos", label: "Hábitos", icon: IconeHabitos },
-  { href: "/metas", label: "Metas", icon: IconeMetas },
+  { href: "/tarefas", label: "Tarefas", icon: IconeTarefas },
   { href: "/financas", label: "Finanças", icon: IconeFinancas },
 ];
 
 const ITENS_MAIS_BASE = [
+  { href: "/metas", label: "Metas" },
   { href: "/diario", label: "Diário" },
   { href: "/notas", label: "Notas" },
 ];
+
 
 const ITEM_ADMIN = { href: "/admin", label: "Admin" };
 
@@ -139,12 +141,11 @@ function IconeHabitos({ className }: { className?: string }) {
   );
 }
 
-function IconeMetas({ className }: { className?: string }) {
+function IconeTarefas({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-      <circle cx="12" cy="12" r="1" />
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="m8 12 2.5 2.5L16 9" />
     </svg>
   );
 }
