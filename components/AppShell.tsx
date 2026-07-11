@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import MobileNav from "@/components/MobileNav";
 import { createClient } from "@/lib/supabase-browser";
+
 
 type StatusAcesso = "verificando" | "aprovado" | "pendente";
 
@@ -13,6 +15,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const router = useRouter();
   const [status, setStatus] = useState<StatusAcesso>("verificando");
+    const [souAdmin, setSouAdmin] = useState(false);
+
+  useEffect(() => {
+    supabase.rpc("is_admin").then(({ data, error }) => {
+      if (!error && data === true) setSouAdmin(true);
+    });
+  }, [supabase]);
+
 
   useEffect(() => {
     // Evita bater no banco a cada troca de página dentro da mesma sessão do navegador
@@ -85,12 +95,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (
+    return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar />
-      <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+      <Sidebar souAdmin={souAdmin} />
+      <main className="flex-1 px-4 pb-24 pt-6 md:px-8 md:py-8 md:pb-8">
         <div className="mx-auto max-w-4xl">{children}</div>
       </main>
+      <MobileNav souAdmin={souAdmin} />
     </div>
   );
 }
