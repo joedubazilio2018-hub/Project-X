@@ -61,4 +61,49 @@ export type JournalEntry = {
   user_id: string;
   content: string;
   mood: Mood | null;
-  entry_date: string; // YYYY-MM
+  entry_date: string; // YYYY-MM-DD
+  created_at: string;
+};
+export type Category = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+};
+export type TransactionType = "income" | "expense";
+export type Transaction = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  type: TransactionType;
+  amount: number;
+  description: string | null;
+  date: string; // YYYY-MM-DD
+  created_at: string;
+  // Recorrência / parcelamento
+  recurrence_group_id: string | null; // agrupa todas as parcelas de um mesmo lançamento
+  installment_number: number | null; // ex: 1, 2, 3...
+  installment_total: number | null; // ex: 3 (total de parcelas)
+  paid: boolean; // se a conta/lançamento já foi pago (ou recebido)
+};
+export type FinancialGoal = {
+  id: string;
+  user_id: string;
+  title: string;
+  target_amount: number;
+  current_amount: number;
+  deadline: string | null;
+  created_at: string;
+};
+export type NoteColor = "default" | "teal" | "amber" | "coral" | "blue" | "purple";
+export type Note = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  content: string | null;
+  color: NoteColor;
+  pinned: boolean;
+  created_at: string;
+  updated_at: string;
+};
