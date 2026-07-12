@@ -4,9 +4,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
-import type { Workout, WorkoutExercise, WorkoutSession } from "@/types/database";
 import DietaView from "@/components/DietaView";
-
+import type { Workout, WorkoutExercise, WorkoutSession } from "@/types/database";
 
 type ExercicioForm = {
   tempId: string;
@@ -31,6 +30,7 @@ function formatarDataHora(iso: string): string {
 
 export default function TreinosPage() {
   const supabase = createClient();
+  const [aba, setAba] = useState<"treinos" | "dieta">("treinos");
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exerciciosPorTreino, setExerciciosPorTreino] = useState<Record<string, WorkoutExercise[]>>({});
   const [sessoes, setSessoes] = useState<WorkoutSession[]>([]);
@@ -301,159 +301,188 @@ export default function TreinosPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold text-ink">Treinos</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {totalTreinosSemana} treino{totalTreinosSemana === 1 ? "" : "s"} nos últimos 7 dias
-          </p>
+          {aba === "treinos" && (
+            <p className="mt-1 text-sm text-ink-muted">
+              {totalTreinosSemana} treino{totalTreinosSemana === 1 ? "" : "s"} nos últimos 7 dias
+            </p>
+          )}
         </div>
+        {aba === "treinos" && (
+          <button
+            onClick={abrirNovaRotina}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90"
+          >
+            + Nova rotina
+          </button>
+        )}
+      </div>
+
+      <div className="mb-6 flex w-fit rounded-lg border border-base-border p-1">
         <button
-          onClick={abrirNovaRotina}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90"
+          onClick={() => setAba("treinos")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            aba === "treinos" ? "bg-ink text-base" : "text-ink-muted hover:text-ink"
+          }`}
         >
-          + Nova rotina
+          🏋️ Treinos
+        </button>
+        <button
+          onClick={() => setAba("dieta")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            aba === "dieta" ? "bg-ink text-base" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          🥗 Dieta
         </button>
       </div>
 
-      {formAberto && (
-        <form
-          onSubmit={salvarRotina}
-          className="mb-6 flex flex-col gap-3 rounded-xl border border-accent bg-base-surface p-4"
-        >
-          <input
-            value={nomeRotina}
-            onChange={(e) => setNomeRotina(e.target.value)}
-            placeholder="Nome da rotina, ex: Upper A (Peito e Tríceps)"
-            className="rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-            required
-          />
-
-          <div className="flex flex-col gap-2">
-            {exerciciosForm.map((ex) => (
-              <div key={ex.tempId} className="flex flex-wrap items-center gap-2 rounded-lg border border-base-border p-2">
-                <input
-                  value={ex.name}
-                  onChange={(e) => atualizarExercicioForm(ex.tempId, "name", e.target.value)}
-                  placeholder="Exercício"
-                  className="min-w-[140px] flex-1 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
-                />
-                <input
-                  value={ex.sets}
-                  onChange={(e) => atualizarExercicioForm(ex.tempId, "sets", e.target.value)}
-                  placeholder="Séries"
-                  inputMode="numeric"
-                  className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-sm text-ink outline-none focus:border-accent"
-                />
-                <input
-                  value={ex.reps}
-                  onChange={(e) => atualizarExercicioForm(ex.tempId, "reps", e.target.value)}
-                  placeholder="Reps"
-                  className="w-20 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-sm text-ink outline-none focus:border-accent"
-                />
-                <input
-                  value={ex.load}
-                  onChange={(e) => atualizarExercicioForm(ex.tempId, "load", e.target.value)}
-                  placeholder="Carga (opcional)"
-                  className="w-28 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
-                />
-                <button
-                  type="button"
-                  onClick={() => removerLinhaExercicio(ex.tempId)}
-                  className="text-ink-faint hover:text-warn"
-                  aria-label="Remover exercício"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={adicionarLinhaExercicio}
-            className="self-start text-sm font-medium text-accent hover:opacity-80"
-          >
-            + Adicionar exercício
-          </button>
-
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={salvando}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              Salvar rotina
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormAberto(null)}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:text-ink"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      {loading ? (
-        <p className="text-sm text-ink-muted">Carregando...</p>
-      ) : workouts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-base-border p-6 text-center">
-          <p className="text-sm text-ink-muted">
-            Nenhuma rotina ainda. Crie a primeira acima.
-          </p>
-        </div>
+      {aba === "dieta" ? (
+        <DietaView />
       ) : (
-        <ul className="flex flex-col gap-2">
-          {workouts.map((workout) => {
-            const exercicios = exerciciosPorTreino[workout.id] ?? [];
-            return (
-              <li key={workout.id}>
-                <SwipeRow onEdit={() => abrirEdicaoRotina(workout)} onDelete={() => arquivarRotina(workout.id)}>
-                  <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink">{workout.name}</p>
-                      <p className="mt-0.5 truncate text-xs text-ink-faint">
-                        {exercicios.length === 0
-                          ? "Sem exercícios"
-                          : exercicios.map((e) => e.name).join(", ")}
-                      </p>
-                    </div>
+        <>
+          {formAberto && (
+            <form
+              onSubmit={salvarRotina}
+              className="mb-6 flex flex-col gap-3 rounded-xl border border-accent bg-base-surface p-4"
+            >
+              <input
+                value={nomeRotina}
+                onChange={(e) => setNomeRotina(e.target.value)}
+                placeholder="Nome da rotina, ex: Upper A (Peito e Tríceps)"
+                className="rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                required
+              />
+
+              <div className="flex flex-col gap-2">
+                {exerciciosForm.map((ex) => (
+                  <div key={ex.tempId} className="flex flex-wrap items-center gap-2 rounded-lg border border-base-border p-2">
+                    <input
+                      value={ex.name}
+                      onChange={(e) => atualizarExercicioForm(ex.tempId, "name", e.target.value)}
+                      placeholder="Exercício"
+                      className="min-w-[140px] flex-1 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      value={ex.sets}
+                      onChange={(e) => atualizarExercicioForm(ex.tempId, "sets", e.target.value)}
+                      placeholder="Séries"
+                      inputMode="numeric"
+                      className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-sm text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      value={ex.reps}
+                      onChange={(e) => atualizarExercicioForm(ex.tempId, "reps", e.target.value)}
+                      placeholder="Reps"
+                      className="w-20 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-sm text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      value={ex.load}
+                      onChange={(e) => atualizarExercicioForm(ex.tempId, "load", e.target.value)}
+                      placeholder="Carga (opcional)"
+                      className="w-28 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
+                    />
                     <button
-                      onClick={() => iniciarTreino(workout)}
-                      disabled={exercicios.length === 0}
-                      className="shrink-0 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-40"
+                      type="button"
+                      onClick={() => removerLinhaExercicio(ex.tempId)}
+                      className="text-ink-faint hover:text-warn"
+                      aria-label="Remover exercício"
                     >
-                      Iniciar
+                      ×
                     </button>
                   </div>
-                </SwipeRow>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                ))}
+              </div>
 
-      {sessoes.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            Últimos treinos
-          </h2>
-          <ul className="flex flex-col gap-1.5">
-            {sessoes.slice(0, 5).map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between rounded-lg border border-base-border px-3 py-2 text-sm"
+              <button
+                type="button"
+                onClick={adicionarLinhaExercicio}
+                className="self-start text-sm font-medium text-accent hover:opacity-80"
               >
-                <span className="text-ink">{s.workout_name}</span>
-                <span className="text-xs text-ink-faint">
-                  {s.finished_at ? formatarDataHora(s.finished_at) : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+                + Adicionar exercício
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={salvando}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  Salvar rotina
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormAberto(null)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:text-ink"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+
+          {loading ? (
+            <p className="text-sm text-ink-muted">Carregando...</p>
+          ) : workouts.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-base-border p-6 text-center">
+              <p className="text-sm text-ink-muted">
+                Nenhuma rotina ainda. Crie a primeira acima.
+              </p>
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {workouts.map((workout) => {
+                const exercicios = exerciciosPorTreino[workout.id] ?? [];
+                return (
+                  <li key={workout.id}>
+                    <SwipeRow onEdit={() => abrirEdicaoRotina(workout)} onDelete={() => arquivarRotina(workout.id)}>
+                      <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-ink">{workout.name}</p>
+                          <p className="mt-0.5 truncate text-xs text-ink-faint">
+                            {exercicios.length === 0
+                              ? "Sem exercícios"
+                              : exercicios.map((e) => e.name).join(", ")}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => iniciarTreino(workout)}
+                          disabled={exercicios.length === 0}
+                          className="shrink-0 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-40"
+                        >
+                          Iniciar
+                        </button>
+                      </div>
+                    </SwipeRow>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {sessoes.length > 0 && (
+            <section className="mt-8">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                Últimos treinos
+              </h2>
+              <ul className="flex flex-col gap-1.5">
+                {sessoes.slice(0, 5).map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between rounded-lg border border-base-border px-3 py-2 text-sm"
+                  >
+                    <span className="text-ink">{s.workout_name}</span>
+                    <span className="text-xs text-ink-faint">
+                      {s.finished_at ? formatarDataHora(s.finished_at) : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
     </AppShell>
   );
