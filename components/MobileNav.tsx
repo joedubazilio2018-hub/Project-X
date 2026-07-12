@@ -13,6 +13,7 @@ const ABAS_PRINCIPAIS = [
 ];
 
 const ITENS_MAIS_BASE = [
+  { href: "/treinos", label: "Treinos" },
   { href: "/metas", label: "Metas" },
   { href: "/diario", label: "Diário" },
   { href: "/notas", label: "Notas" },
