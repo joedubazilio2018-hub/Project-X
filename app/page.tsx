@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { frasedoDia } from "@/lib/frase-do-dia";
 import AppShell from "@/components/AppShell";
+import CompartilharFrase from "@/components/CompartilharFrase";
 import type { Habit, HabitLog, Goal, JournalEntry, Transaction, Mood } from "@/types/database";
 
 type EventoTimeline = {
@@ -360,6 +361,7 @@ export default function DashboardPage() {
           "{frase.frase}"
         </p>
         <p className="mt-2 text-sm text-ink-muted">{frase.explicacao}</p>
+        <CompartilharFrase frase={frase.frase} explicacao={frase.explicacao} />
       </section>
 
       {loading ? (
