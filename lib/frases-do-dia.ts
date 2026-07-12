@@ -132,4 +132,118 @@ export const FRASES_DO_DIA: FraseDoDia[] = [
     explicacao:
       "Compare o que você mais fez essa semana com o que você mais deseja para sua vida. Ajustar essa distância é o trabalho real.",
   },
+  // ===== Modo Estoico =====
+  {
+    frase: "Você não controla o que acontece, só controla como responde.",
+    explicacao:
+      "Antes de reagir a algo que te irritou hoje, pare 3 segundos e pergunte: isso está sob meu controle? Se não, solte. Se está, aja.",
+  },
+  {
+    frase: "Não são as coisas que nos perturbam, mas a opinião que temos sobre elas.",
+    explicacao:
+      "Quando algo te incomodar hoje, separe o fato ('atrasaram a entrega') da história que você contou sobre ele ('isso vai estragar meu dia'). Mude só a história.",
+  },
+  {
+    frase: "A dor que você sente é quase sempre sobre a expectativa que você tinha, não sobre o evento em si.",
+    explicacao:
+      "Antes de começar uma tarefa hoje, imagine que ela pode não sair como planejado. Isso não é pessimismo, é o que te impede de ser derrubado pela surpresa.",
+  },
+  {
+    frase: "Prepare-se para o pior, trabalhe pelo melhor, aceite o que vier.",
+    explicacao:
+      "Escolha uma situação incerta que você enfrenta essa semana e escreva o pior cenário realista. Você vai perceber que é suportável — e isso libera energia pra agir.",
+  },
+  {
+    frase: "O obstáculo no caminho se torna o caminho.",
+    explicacao:
+      "Pegue o maior problema do seu dia hoje e pergunte: que habilidade essa dificuldade está me forçando a desenvolver? Trate o obstáculo como treino, não como azar.",
+  },
+  {
+    frase: "Não é a carga que te quebra, é como você a carrega.",
+    explicacao:
+      "Se algo pesa muito hoje, não pergunte 'por que isso caiu em mim', pergunte 'como eu divido isso em partes que consigo carregar uma de cada vez'.",
+  },
+  {
+    frase: "A queixa não muda o evento, só multiplica o sofrimento.",
+    explicacao:
+      "Cada vez que for reclamar de algo hoje, troque a reclamação por uma ação: mesmo pequena, dirigida ao que você pode mudar naquela situação.",
+  },
+  {
+    frase: "Você sofre não pelo que perdeu, mas por ter esquecido que era emprestado.",
+    explicacao:
+      "Pense em algo que você teme perder — um bem, uma posição, um relacionamento. Lembrar que nada é permanente não é medo, é o que te faz valorizar mais hoje.",
+  },
+  {
+    frase: "A morte não é o inimigo do sentido, é o que dá sentido ao tempo.",
+    explicacao:
+      "Se você soubesse que hoje era um dos seus últimos dias produtivos, o que faria diferente na próxima hora? Faça isso.",
+  },
+  {
+    frase: "Riqueza não é ter muito, é precisar de pouco.",
+    explicacao:
+      "Antes de comprar algo hoje por impulso, pergunte: isso resolve uma necessidade real ou é só um desconforto momentâneo que a posse promete calar?",
+  },
+  {
+    frase: "Ninguém é livre se não é senhor de si mesmo.",
+    explicacao:
+      "Identifique um impulso que costuma te dominar (raiva, procrastinação, comparação) e hoje, na primeira vez que ele aparecer, apenas observe antes de agir.",
+  },
+  {
+    frase: "A virtude é o único bem que ninguém pode tirar de você.",
+    explicacao:
+      "Hoje, ao tomar uma decisão difícil, pergunte não 'o que me traz vantagem', mas 'o que uma pessoa íntegra faria aqui' — e siga essa resposta.",
+  },
+  {
+    frase: "Você não precisa de uma vida mais longa, precisa de uma vida mais bem usada.",
+    explicacao:
+      "No fim do dia hoje, em vez de contar quantas horas trabalhou, avalie quantas foram realmente intencionais — e ajuste amanhã com base nisso.",
+  },
+  {
+    frase: "Quem depende da opinião alheia entregou as chaves da própria paz.",
+    explicacao:
+      "Antes de mudar uma decisão hoje só por causa do que os outros vão pensar, pergunte: eu faria isso mesmo se ninguém ficasse sabendo?",
+  },
+  {
+    frase: "A raiva custa mais caro para quem a sente do que para quem a provocou.",
+    explicacao:
+      "Da próxima vez que alguém te irritar hoje, adie a resposta por um minuto. Na maioria das vezes, o minuto sozinho já resolve metade do problema.",
+  },
+  {
+    frase: "Julgue seus dias pela qualidade das suas escolhas, não pela sorte dos resultados.",
+    explicacao:
+      "No fim do dia, não pergunte só 'deu certo?'. Pergunte 'eu tomei a melhor decisão possível com o que eu sabia naquele momento?'.",
+  },
+  {
+    frase: "O que os outros fazem não é problema seu; o que você faz diante disso, é.",
+    explicacao:
+      "Se alguém te tratar mal hoje, resista ao impulso de gastar energia mental julgando essa pessoa. Gaste essa energia decidindo como você vai agir.",
+  },
+  {
+    frase: "Viva o dia de hoje como se fosse completo em si mesmo, não como rascunho de outro dia melhor.",
+    explicacao:
+      "Escolha uma tarefa hoje e execute-a como se ela fosse o ponto principal do seu dia, não um degrau qualquer a caminho de outra coisa.",
+  },
+  {
+    frase: "A adversidade revela quem você é; a facilidade só esconde.",
+    explicacao:
+      "Na próxima dificuldade hoje, em vez de perguntar 'por que isso comigo', pergunte 'o que isso está revelando sobre mim que eu precisava ver'.",
+  },
+  {
+    frase: "Não desperdice o que resta da sua vida com pensamentos sobre os outros.",
+    explicacao:
+      "Se você notar que está gastando tempo hoje comparando sua vida com a de outra pessoa, volte a atenção pra uma ação concreta no seu próprio caminho.",
+  },
+  {
+    frase: "Toda manhã pergunte: o que eu devo fazer para viver de acordo com meus princípios hoje?",
+    explicacao:
+      "Antes de abrir o celular pela manhã, escreva uma frase com a intenção do dia. Revise essa frase à noite e veja o quanto ela guiou suas ações.",
+  },
+  {
+    frase: "O tempo perdido reclamando é tempo que não volta mais e não resolve nada.",
+    explicacao:
+      "Cronometre quanto tempo você passa reclamando de algo hoje. Depois, use metade desse tempo agindo sobre a parte do problema que está ao seu alcance.",
+  },
+  {
+    frase: "Aceitar não é desistir, é parar de gastar força lutando contra o que já aconteceu.",
+    
 ];
