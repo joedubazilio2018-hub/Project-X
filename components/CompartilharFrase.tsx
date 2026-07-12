@@ -43,14 +43,14 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas não suportado");
 
-  // Fundo com gradiente sutil (mesma paleta do app)
+  // Fundo quase preto, com leve gradiente — mesmo tom escuro do logo
   const fundo = ctx.createLinearGradient(0, 0, LARGURA, ALTURA);
-  fundo.addColorStop(0, "#0B0E14");
-  fundo.addColorStop(1, "#12161F");
+  fundo.addColorStop(0, "#000000");
+  fundo.addColorStop(1, "#14141a");
   ctx.fillStyle = fundo;
   ctx.fillRect(0, 0, LARGURA, ALTURA);
 
-  // Glow decorativo (teal, cor de destaque do app)
+  // Glow decorativo suave em branco, discreto, sem cor
   const glow = ctx.createRadialGradient(
     LARGURA / 2,
     ALTURA * 0.32,
@@ -59,20 +59,25 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
     ALTURA * 0.32,
     LARGURA * 0.65
   );
-  glow.addColorStop(0, "rgba(45, 212, 191, 0.16)");
-  glow.addColorStop(1, "rgba(45, 212, 191, 0)");
+  glow.addColorStop(0, "rgba(255, 255, 255, 0.07)");
+  glow.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, LARGURA, ALTURA);
 
+  // Moldura fina, ecoando o traço circular do logo
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(28, 28, LARGURA - 56, ALTURA - 56);
+
   // Aspas decorativas
-  ctx.fillStyle = "rgba(45, 212, 191, 0.35)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
   ctx.font = "italic 900 160px Georgia, serif";
   ctx.textAlign = "left";
   ctx.fillText("\u201C", LARGURA * 0.1, ALTURA * 0.32);
 
   // Frase principal, centralizada e quebrada em linhas
   ctx.textAlign = "center";
-  ctx.fillStyle = "#E7EAF0";
+  ctx.fillStyle = "#F2F2F2";
   let tamanhoFonte = 62;
   const maxLarguraTexto = LARGURA * 0.8;
   let linhas: string[] = [];
@@ -94,7 +99,7 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
   });
 
   // Explicação, menor e mais discreta, abaixo da frase
-  ctx.fillStyle = "#8B93A5";
+  ctx.fillStyle = "#9A9A9F";
   ctx.font = "500 32px Arial, sans-serif";
   const linhasExplicacao = quebrarLinhas(ctx, explicacao, LARGURA * 0.72).slice(0, 3);
   let yExplicacao = yTexto + 20;
@@ -104,7 +109,7 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
   });
 
   // Linha divisória sutil acima da assinatura
-  ctx.strokeStyle = "rgba(139, 147, 165, 0.25)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(LARGURA * 0.38, ALTURA * 0.87);
@@ -113,12 +118,12 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
 
   // Logo + nome do app na base, como assinatura da marca
   try {
-    const logo = await carregarImagem("/icon-512.png");
-    const tamanhoLogo = 72;
+    const logo = await carregarImagem("/logo-mark.png");
+    const tamanhoLogo = 76;
     ctx.save();
     ctx.beginPath();
     ctx.arc(
-      LARGURA / 2 - 90,
+      LARGURA / 2 - 92,
       ALTURA * 0.93,
       tamanhoLogo / 2,
       0,
@@ -128,7 +133,7 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
     ctx.clip();
     ctx.drawImage(
       logo,
-      LARGURA / 2 - 90 - tamanhoLogo / 2,
+      LARGURA / 2 - 92 - tamanhoLogo / 2,
       ALTURA * 0.93 - tamanhoLogo / 2,
       tamanhoLogo,
       tamanhoLogo
@@ -139,9 +144,9 @@ async function desenharTemplate(frase: string, explicacao: string): Promise<stri
   }
 
   ctx.textAlign = "left";
-  ctx.fillStyle = "#E7EAF0";
+  ctx.fillStyle = "#F2F2F2";
   ctx.font = "700 34px Arial, sans-serif";
-  ctx.fillText("Ascen", LARGURA / 2 - 40, ALTURA * 0.93 + 12);
+  ctx.fillText("ASCEN", LARGURA / 2 - 40, ALTURA * 0.93 + 12);
 
   return canvas.toDataURL("image/png");
 }
@@ -207,7 +212,7 @@ export default function CompartilharFrase({
     <>
       <button
         onClick={abrir}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-base px-3 py-1.5 text-xs font-medium text-gold hover:bg-gold/10"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-ink-faint/30 bg-base px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-ink-faint/10 hover:text-ink"
       >
         <span aria-hidden>📤</span>
         Postar nas redes
