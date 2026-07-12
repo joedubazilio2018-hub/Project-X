@@ -436,25 +436,39 @@ export default function TreinosPage() {
                 const exercicios = exerciciosPorTreino[workout.id] ?? [];
                 return (
                   <li key={workout.id}>
-                    <SwipeRow onEdit={() => abrirEdicaoRotina(workout)} onDelete={() => arquivarRotina(workout.id)}>
-                      <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-ink">{workout.name}</p>
-                          <p className="mt-0.5 truncate text-xs text-ink-faint">
-                            {exercicios.length === 0
-                              ? "Sem exercícios"
-                              : exercicios.map((e) => e.name).join(", ")}
-                          </p>
-                        </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-base-border bg-base-surface px-4 py-3.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink">{workout.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-ink-faint">
+                          {exercicios.length === 0
+                            ? "Sem exercícios"
+                            : exercicios.map((e) => e.name).join(", ")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          onClick={() => abrirEdicaoRotina(workout)}
+                          aria-label="Editar rotina"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint hover:bg-base hover:text-ink"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => arquivarRotina(workout.id)}
+                          aria-label="Excluir rotina"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint hover:bg-base hover:text-warn"
+                        >
+                          🗑
+                        </button>
                         <button
                           onClick={() => iniciarTreino(workout)}
                           disabled={exercicios.length === 0}
-                          className="shrink-0 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-40"
+                          className="rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-40"
                         >
                           Iniciar
                         </button>
                       </div>
-                    </SwipeRow>
+                    </div>
                   </li>
                 );
               })}
