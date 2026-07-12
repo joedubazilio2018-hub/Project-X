@@ -13,14 +13,14 @@ const ABAS_PRINCIPAIS = [
 ];
 
 const ITENS_MAIS_BASE = [
-  { href: "/treinos", label: "Treinos" },
-  { href: "/metas", label: "Metas" },
-  { href: "/diario", label: "Diário" },
-  { href: "/notas", label: "Notas" },
+  { href: "/treinos", label: "Treinos", emoji: "🏋️" },
+  { href: "/metas", label: "Metas", emoji: "🎯" },
+  { href: "/diario", label: "Diário", emoji: "📔" },
+  { href: "/notas", label: "Notas", emoji: "🗒️" },
 ];
 
 
-const ITEM_ADMIN = { href: "/admin", label: "Admin" };
+const ITEM_ADMIN = { href: "/admin", label: "Admin", emoji: "🛠️" };
 
 export default function MobileNav({ souAdmin = false }: { souAdmin?: boolean }) {
   const pathname = usePathname();
@@ -84,39 +84,42 @@ export default function MobileNav({ souAdmin = false }: { souAdmin?: boolean }) 
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-base-border" />
-            <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-3 gap-3">
               {itensMais.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setMaisAberto(false)}
-                  className={`rounded-lg px-3 py-3 text-sm font-medium ${
+                  className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border text-center ${
                     pathname === item.href
-                      ? "bg-accent-dim text-accent"
-                      : "text-ink-muted hover:bg-base hover:text-ink"
+                      ? "border-accent/40 bg-accent-dim text-accent"
+                      : "border-base-border bg-base text-ink-muted hover:bg-base-border/40"
                   }`}
                 >
-                  {item.label}
+                  <span className="text-2xl leading-none">{item.emoji}</span>
+                  <span className="text-xs font-medium">{item.label}</span>
                 </Link>
               ))}
               <Link
                 href="/perfil"
                 onClick={() => setMaisAberto(false)}
-                className={`rounded-lg px-3 py-3 text-sm font-medium ${
+                className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border text-center ${
                   pathname === "/perfil"
-                    ? "bg-accent-dim text-accent"
-                    : "text-ink-muted hover:bg-base hover:text-ink"
+                    ? "border-accent/40 bg-accent-dim text-accent"
+                    : "border-base-border bg-base text-ink-muted hover:bg-base-border/40"
                 }`}
               >
-                Editar perfil
+                <span className="text-2xl leading-none">👤</span>
+                <span className="text-xs font-medium">Perfil</span>
               </Link>
-              <button
-                onClick={sair}
-                className="rounded-lg px-3 py-3 text-left text-sm font-medium text-ink-faint hover:bg-base hover:text-warn"
-              >
-                Sair
-              </button>
             </div>
+            <button
+              onClick={sair}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-ink-faint hover:bg-base hover:text-warn"
+            >
+              <span>🚪</span>
+              Sair
+            </button>
           </div>
         </div>
       )}
