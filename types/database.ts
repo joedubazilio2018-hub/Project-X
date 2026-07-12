@@ -105,6 +105,34 @@ export type Task = {
   completed_at: string | null;
   created_at: string;
 };
+export type Workout = {
+  id: string;
+  user_id: string;
+  name: string;
+  notes: string | null;
+  position: number;
+  archived: boolean;
+  created_at: string;
+};
+export type WorkoutExercise = {
+  id: string;
+  workout_id: string;
+  user_id: string;
+  name: string;
+  sets: number;
+  reps: string;
+  load: string | null;
+  position: number;
+  created_at: string;
+};
+export type WorkoutSession = {
+  id: string;
+  user_id: string;
+  workout_id: string | null;
+  workout_name: string;
+  started_at: string;
+  finished_at: string | null;
+};
 export type NoteColor = "default" | "teal" | "amber" | "coral" | "blue" | "purple";
 export type Note = {
   id: string;
