@@ -133,6 +133,34 @@ export type WorkoutSession = {
   started_at: string;
   finished_at: string | null;
 };
+export type Sex = "m" | "f";
+export type ActivityLevel = "sedentario" | "leve" | "moderado" | "intenso" | "muito_intenso";
+export type BodyMetrics = {
+  user_id: string;
+  weight_kg: number;
+  height_cm: number;
+  age: number;
+  sex: Sex;
+  activity_level: ActivityLevel;
+  updated_at: string;
+};
+export type Meal = {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  created_at: string;
+};
+export type MealItem = {
+  id: string;
+  meal_id: string;
+  user_id: string;
+  name: string;
+  protein_g: number;
+  carb_g: number;
+  fat_g: number;
+  created_at: string;
+};
 export type NoteColor = "default" | "teal" | "amber" | "coral" | "blue" | "purple";
 export type Note = {
   id: string;
