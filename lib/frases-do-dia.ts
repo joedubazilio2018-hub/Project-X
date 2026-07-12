@@ -244,6 +244,10 @@ export const FRASES_DO_DIA: FraseDoDia[] = [
       "Cronometre quanto tempo você passa reclamando de algo hoje. Depois, use metade desse tempo agindo sobre a parte do problema que está ao seu alcance.",
   },
   {
+      {
     frase: "Aceitar não é desistir, é parar de gastar força lutando contra o que já aconteceu.",
+    explicacao:
+      "Pense em algo do passado recente que você ainda revive mentalmente. Hoje, escreva uma frase de aceitação sobre isso e direcione essa energia para o presente.",
   },
+
 ];
