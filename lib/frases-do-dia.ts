@@ -245,5 +245,5 @@ export const FRASES_DO_DIA: FraseDoDia[] = [
   },
   {
     frase: "Aceitar não é desistir, é parar de gastar força lutando contra o que já aconteceu.",
-    
+  },
 ];
