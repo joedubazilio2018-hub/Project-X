@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import SwipeRow from "@/components/SwipeRow";
 import type { BodyMetrics, Meal, MealItem, Sex, ActivityLevel } from "@/types/database";
 
 const MULTIPLICADORES: Record<ActivityLevel, number> = {
@@ -59,6 +58,15 @@ export default function DietaView() {
   const [mostrarFormRefeicao, setMostrarFormRefeicao] = useState(false);
 
   const [itemForm, setItemForm] = useState<Record<string, { name: string; protein: string; carb: string; fat: string }>>({});
+
+  const [itemEditando, setItemEditando] = useState<{
+    id: string;
+    mealId: string;
+    name: string;
+    protein: string;
+    carb: string;
+    fat: string;
+  } | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -197,6 +205,36 @@ export default function DietaView() {
 
   async function excluirItem(itemId: string) {
     await supabase.from("meal_items").delete().eq("id", itemId);
+    carregar();
+  }
+
+  function iniciarEdicaoItem(item: MealItem) {
+    setItemEditando({
+      id: item.id,
+      mealId: item.meal_id,
+      name: item.name,
+      protein: String(item.protein_g),
+      carb: String(item.carb_g),
+      fat: String(item.fat_g),
+    });
+  }
+
+  function cancelarEdicaoItem() {
+    setItemEditando(null);
+  }
+
+  async function salvarEdicaoItem() {
+    if (!itemEditando || !itemEditando.name.trim()) return;
+    await supabase
+      .from("meal_items")
+      .update({
+        name: itemEditando.name.trim(),
+        protein_g: Number(itemEditando.protein) || 0,
+        carb_g: Number(itemEditando.carb) || 0,
+        fat_g: Number(itemEditando.fat) || 0,
+      })
+      .eq("id", itemEditando.id);
+    setItemEditando(null);
     carregar();
   }
 
@@ -361,28 +399,93 @@ export default function DietaView() {
 
               return (
                 <div key={meal.id} className="rounded-xl border border-base-border bg-base-surface p-4">
-                  <SwipeRow onEdit={() => {}} onDelete={() => excluirRefeicao(meal.id)}>
-                    <div className="flex items-center justify-between px-1 py-1">
-                      <h3 className="text-sm font-semibold text-ink">{meal.name}</h3>
+                  <div className="flex items-center justify-between px-1 py-1">
+                    <h3 className="text-sm font-semibold text-ink">{meal.name}</h3>
+                    <div className="flex items-center gap-2">
                       <span className="text-xs text-ink-faint">{Math.round(totalRefeicao)} kcal</span>
+                      <button
+                        onClick={() => excluirRefeicao(meal.id)}
+                        aria-label="Excluir refeição"
+                        className="text-ink-faint hover:text-warn"
+                      >
+                        🗑
+                      </button>
                     </div>
-                  </SwipeRow>
+                  </div>
 
                   {items.length > 0 && (
                     <div className="mt-2 flex flex-col gap-1.5">
-                      {items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-xs">
-                          <span className="text-ink-muted">{item.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-ink-faint">
-                              P{item.protein_g} C{item.carb_g} G{item.fat_g}
-                            </span>
-                            <button onClick={() => excluirItem(item.id)} className="text-ink-faint hover:text-warn">
-                              ×
+                      {items.map((item) =>
+                        itemEditando?.id === item.id ? (
+                          <div
+                            key={item.id}
+                            className="flex flex-wrap items-center gap-1.5 rounded-lg border border-accent bg-base p-2"
+                          >
+                            <input
+                              value={itemEditando.name}
+                              onChange={(e) => setItemEditando({ ...itemEditando, name: e.target.value })}
+                              autoFocus
+                              className="min-w-[120px] flex-1 rounded-md border border-base-border bg-base-surface px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+                            />
+                            <input
+                              value={itemEditando.protein}
+                              onChange={(e) => setItemEditando({ ...itemEditando, protein: e.target.value })}
+                              placeholder="Prot(g)"
+                              inputMode="decimal"
+                              className="w-16 rounded-md border border-base-border bg-base-surface px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
+                            />
+                            <input
+                              value={itemEditando.carb}
+                              onChange={(e) => setItemEditando({ ...itemEditando, carb: e.target.value })}
+                              placeholder="Carb(g)"
+                              inputMode="decimal"
+                              className="w-16 rounded-md border border-base-border bg-base-surface px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
+                            />
+                            <input
+                              value={itemEditando.fat}
+                              onChange={(e) => setItemEditando({ ...itemEditando, fat: e.target.value })}
+                              placeholder="Gord(g)"
+                              inputMode="decimal"
+                              className="w-16 rounded-md border border-base-border bg-base-surface px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
+                            />
+                            <button
+                              onClick={salvarEdicaoItem}
+                              className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-base"
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              onClick={cancelarEdicaoItem}
+                              className="text-xs text-ink-faint hover:text-ink"
+                            >
+                              Cancelar
                             </button>
                           </div>
-                        </div>
-                      ))}
+                        ) : (
+                          <div key={item.id} className="flex items-center justify-between text-xs">
+                            <span className="text-ink-muted">{item.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-ink-faint">
+                                P{item.protein_g} C{item.carb_g} G{item.fat_g}
+                              </span>
+                              <button
+                                onClick={() => iniciarEdicaoItem(item)}
+                                aria-label="Editar item"
+                                className="text-ink-faint hover:text-accent"
+                              >
+                                ✎
+                              </button>
+                              <button
+                                onClick={() => excluirItem(item.id)}
+                                aria-label="Excluir item"
+                                className="text-ink-faint hover:text-warn"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      )}
                     </div>
                   )}
 
