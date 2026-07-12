@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
 import type { Workout, WorkoutExercise, WorkoutSession } from "@/types/database";
+import DietaView from "@/components/DietaView";
+
 
 type ExercicioForm = {
   tempId: string;
