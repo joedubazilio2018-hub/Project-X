@@ -6,7 +6,20 @@ import { createClient } from "@/lib/supabase-browser";
 import { frasedoDia } from "@/lib/frase-do-dia";
 import AppShell from "@/components/AppShell";
 import CompartilharFrase from "@/components/CompartilharFrase";
-import type { Habit, HabitLog, Goal, JournalEntry, Transaction, Mood } from "@/types/database";
+import { calcularTDEE, calcularKcal } from "@/lib/nutricao";
+import type {
+  Habit,
+  HabitLog,
+  Goal,
+  JournalEntry,
+  Transaction,
+  Mood,
+  Task,
+  Workout,
+  WorkoutSession,
+  BodyMetrics,
+  MealItem,
+} from "@/types/database";
 
 type EventoTimeline = {
   data: string; // YYYY-MM-DD, usado para ordenar
@@ -47,6 +60,11 @@ export default function DashboardPage() {
   const [goalsRecentes, setGoalsRecentes] = useState<Goal[]>([]);
   const [diarioRecente, setDiarioRecente] = useState<JournalEntry[]>([]);
   const [transacoesRecentes, setTransacoesRecentes] = useState<Transaction[]>([]);
+  const [tarefas, setTarefas] = useState<Task[]>([]);
+  const [treinosAtivos, setTreinosAtivos] = useState<Workout[]>([]);
+  const [sessoesTreino, setSessoesTreino] = useState<WorkoutSession[]>([]);
+  const [bodyMetrics, setBodyMetrics] = useState<BodyMetrics | null>(null);
+  const [itensDietaHoje, setItensDietaHoje] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [nomeUsuario, setNomeUsuario] = useState<string>("");
 
@@ -91,11 +109,57 @@ export default function DashboardPage() {
       .select("*")
       .order("created_at", { ascending: false });
 
+    const { data: tarefasData } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("due_date", { ascending: true, nullsFirst: false });
+
+    const { data: treinosData } = await supabase
+      .from("workouts")
+      .select("*")
+      .eq("archived", false);
+
+    const { data: sessoesData } = await supabase
+      .from("workout_sessions")
+      .select("*")
+      .not("finished_at", "is", null)
+      .order("finished_at", { ascending: false })
+      .limit(10);
+
+    const hojeCarregar = hojeISO();
+    const userId = userData.user?.id;
+
+    const { data: metricsData } = await supabase
+      .from("body_metrics")
+      .select("*")
+      .eq("user_id", userId ?? "")
+      .maybeSingle();
+
+    const { data: refeicoesHojeData } = await supabase
+      .from("meals")
+      .select("*")
+      .eq("date", hojeCarregar);
+
+    const idsRefeicoesHoje = (refeicoesHojeData ?? []).map((m) => m.id as string);
+    let itensDietaData: MealItem[] = [];
+    if (idsRefeicoesHoje.length > 0) {
+      const { data } = await supabase
+        .from("meal_items")
+        .select("*")
+        .in("meal_id", idsRefeicoesHoje);
+      itensDietaData = (data as MealItem[]) ?? [];
+    }
+
     setHabits((habitsData as Habit[]) ?? []);
     setLogs90dias((logsData as HabitLog[]) ?? []);
     setGoalsRecentes((goalsData as Goal[]) ?? []);
     setDiarioRecente((diarioData as JournalEntry[]) ?? []);
     setTransacoesRecentes((transacoesData as Transaction[]) ?? []);
+    setTarefas((tarefasData as Task[]) ?? []);
+    setTreinosAtivos((treinosData as Workout[]) ?? []);
+    setSessoesTreino((sessoesData as WorkoutSession[]) ?? []);
+    setBodyMetrics((metricsData as BodyMetrics) ?? null);
+    setItensDietaHoje(itensDietaData);
     setLoading(false);
   }, [supabase]);
 
@@ -344,6 +408,42 @@ export default function DashboardPage() {
     return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   }
 
+  // Resumo de Tarefas: pendentes hoje, vencidas e concluídas hoje
+  const tarefasHojePendentes = tarefas.filter(
+    (t) => !t.done && t.due_date === hoje
+  ).length;
+  const tarefasVencidas = tarefas.filter(
+    (t) => !t.done && t.due_date !== null && t.due_date < hoje
+  ).length;
+  const tarefasConcluidasHoje = tarefas.filter(
+    (t) => t.done && t.completed_at?.slice(0, 10) === hoje
+  ).length;
+
+  // Resumo de Treinos: quantidade na última semana + último treino finalizado
+  const seteDiasAtras = new Date();
+  seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+  const treinosSemana = sessoesTreino.filter(
+    (s) => s.finished_at && new Date(s.finished_at) >= seteDiasAtras
+  ).length;
+  const ultimoTreino = sessoesTreino[0];
+
+  // Resumo de Dieta: macros e kcal de hoje vs. gasto calórico estimado (TDEE)
+  const totaisDietaHoje = itensDietaHoje.reduce(
+    (acc, item) => ({
+      protein: acc.protein + item.protein_g,
+      carb: acc.carb + item.carb_g,
+      fat: acc.fat + item.fat_g,
+    }),
+    { protein: 0, carb: 0, fat: 0 }
+  );
+  const kcalDietaHoje = calcularKcal(
+    totaisDietaHoje.protein,
+    totaisDietaHoje.carb,
+    totaisDietaHoje.fat
+  );
+  const tdeeHoje = bodyMetrics ? calcularTDEE(bodyMetrics) : null;
+  const deficitDietaHoje = tdeeHoje !== null ? Math.round(kcalDietaHoje - tdeeHoje) : null;
+
   return (
     <AppShell>
       <header className="mb-6">
@@ -454,6 +554,155 @@ export default function DashboardPage() {
                         {formatarDataCurta(proximaMetaComPrazo.deadline!)}
                       </span>
                     </p>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          {/* Resumo de Tarefas */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Tarefas</h2>
+              <Link
+                href="/tarefas"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Ver todas →
+              </Link>
+            </div>
+
+            {tarefas.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Você ainda não tem tarefas cadastradas.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="font-display text-xl font-bold text-ink">
+                    {tarefasHojePendentes}
+                  </p>
+                  <p className="text-xs text-ink-muted">Para hoje</p>
+                </div>
+                <div>
+                  <p
+                    className={`font-display text-xl font-bold ${
+                      tarefasVencidas > 0 ? "text-warn" : "text-ink-faint"
+                    }`}
+                  >
+                    {tarefasVencidas}
+                  </p>
+                  <p className="text-xs text-ink-muted">Vencidas</p>
+                </div>
+                <div>
+                  <p className="font-display text-xl font-bold text-accent">
+                    {tarefasConcluidasHoje}
+                  </p>
+                  <p className="text-xs text-ink-muted">Concluídas hoje</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Resumo de Treinos */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Treinos</h2>
+              <Link
+                href="/treinos"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Ver treinos →
+              </Link>
+            </div>
+
+            {treinosAtivos.length === 0 && sessoesTreino.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Você ainda não tem rotinas de treino cadastradas.
+              </p>
+            ) : (
+              <div className="flex items-center gap-6">
+                <div>
+                  <p className="font-display text-xl font-bold text-ink">
+                    {treinosSemana}
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    {treinosSemana === 1 ? "treino" : "treinos"} (últimos 7 dias)
+                  </p>
+                </div>
+                {ultimoTreino && (
+                  <div>
+                    <p className="text-sm font-medium text-ink">
+                      {ultimoTreino.workout_name}
+                    </p>
+                    <p className="text-xs text-ink-muted">
+                      Último treino ·{" "}
+                      {ultimoTreino.finished_at
+                        ? formatarDataCurta(ultimoTreino.finished_at.slice(0, 10))
+                        : ""}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Resumo de Dieta */}
+          <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Dieta</h2>
+              <Link
+                href="/treinos?aba=dieta"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Ver dieta →
+              </Link>
+            </div>
+
+            {!bodyMetrics ? (
+              <p className="text-sm text-ink-muted">
+                Configure seu perfil na Dieta para acompanhar seu gasto calórico aqui.
+              </p>
+            ) : (
+              <>
+                <div className="mb-4 grid grid-cols-4 gap-2 text-center">
+                  <div>
+                    <p className="font-display text-lg font-bold text-accent">
+                      {Math.round(totaisDietaHoje.protein)}g
+                    </p>
+                    <p className="text-[10px] text-ink-muted">Proteína</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg font-bold text-ink">
+                      {Math.round(totaisDietaHoje.carb)}g
+                    </p>
+                    <p className="text-[10px] text-ink-muted">Carbo</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg font-bold text-warn">
+                      {Math.round(totaisDietaHoje.fat)}g
+                    </p>
+                    <p className="text-[10px] text-ink-muted">Gordura</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg font-bold text-ink">
+                      {Math.round(kcalDietaHoje)}
+                    </p>
+                    <p className="text-[10px] text-ink-muted">kcal hoje</p>
+                  </div>
+                </div>
+
+                {deficitDietaHoje !== null && (
+                  <div
+                    className={`rounded-lg px-3 py-2 text-center text-sm font-semibold ${
+                      deficitDietaHoje <= 0
+                        ? "bg-accent-dim text-accent"
+                        : "bg-warn-dim text-warn"
+                    }`}
+                  >
+                    {deficitDietaHoje <= 0 ? "Déficit calórico" : "Superávit calórico"}:{" "}
+                    {deficitDietaHoje > 0 ? "+" : ""}
+                    {deficitDietaHoje} kcal
                   </div>
                 )}
               </>
