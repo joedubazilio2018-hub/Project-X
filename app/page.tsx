@@ -171,12 +171,50 @@ export default function DashboardPage() {
   const dias7 = dias90.slice(-7);
   const hoje = hojeISO();
 
-  const logsPorDia7 = dias7.map((dia) => {
-    const logsDoDia = logs90dias.filter((l) => l.date === dia && l.done);
-    const total = habits.length;
-    const feitos = logsDoDia.length;
-    return { dia, feitos, total, pct: total > 0 ? feitos / total : 0 };
-  });
+  // Combina hábitos, metas e tarefas num único "score do dia" (0-100),
+  // usado no card de hoje, no gráfico "Últimos 7 dias" e na "Constância".
+  // Hábitos valem até 55 pontos (proporcional ao % concluído no dia).
+  // Metas valem até 40 pontos: concluída = 15 pts (máx 2 = 30);
+  // criada/movida = 5 pts (máx 2 = 10).
+  // Tarefas valem até 15 pontos: cada uma concluída = 7 pts (máx ~2).
+  function calcularScoreDoDia(dia: string) {
+    const feitosHabitos = logs90dias.filter((l) => l.date === dia && l.done).length;
+    const totalHabitos = habits.length;
+
+    const metasConcluidas = goalsRecentes.filter(
+      (g) => g.status === "done" && g.status_changed_at.slice(0, 10) === dia
+    ).length;
+    const metasMovimentadas = goalsRecentes.filter(
+      (g) => g.status !== "done" && g.status_changed_at.slice(0, 10) === dia
+    ).length;
+
+    const tarefasConcluidas = tarefas.filter(
+      (t) => t.done && t.completed_at?.slice(0, 10) === dia
+    ).length;
+
+    const pontosHabitos = totalHabitos > 0 ? (feitosHabitos / totalHabitos) * 55 : null;
+    const pontosMetas = Math.min(metasConcluidas * 15, 30) + Math.min(metasMovimentadas * 5, 10);
+    const pontosTarefas = Math.min(tarefasConcluidas * 7, 15);
+
+    const temAtividade =
+      pontosHabitos !== null || metasConcluidas > 0 || metasMovimentadas > 0 || tarefasConcluidas > 0;
+
+    const score = temAtividade
+      ? Math.min(Math.round((pontosHabitos ?? 0) + pontosMetas + pontosTarefas), 100)
+      : null;
+
+    return {
+      dia,
+      score,
+      feitosHabitos,
+      totalHabitos,
+      metasConcluidas,
+      metasMovimentadas,
+      tarefasConcluidas,
+    };
+  }
+
+  const atividadePorDia7 = dias7.map((dia) => calcularScoreDoDia(dia));
 
   const feitosHoje = logs90dias.filter((l) => l.date === hoje && l.done).length;
   const totalHoje = habits.length;
@@ -202,25 +240,11 @@ export default function DashboardPage() {
   const streak = calcularStreak();
 
   // ── Score Diário ──
-  // Hábitos valem até 70 pontos (proporcional ao % concluído hoje).
-  // Metas valem até 30 pontos: meta concluída hoje = 15 pts (máx 2 = 30);
-  // meta criada ou movida para "em andamento" hoje = 5 pts.
-  const metasConcluidasHoje = goalsRecentes.filter(
-    (g) => g.status === "done" && g.status_changed_at.slice(0, 10) === hoje
-  ).length;
-  const metasMovimentadasHoje = goalsRecentes.filter(
-    (g) => g.status !== "done" && g.status_changed_at.slice(0, 10) === hoje
-  ).length;
-
-  const pontosHabitos = totalHoje > 0 ? (feitosHoje / totalHoje) * 70 : null;
-  const pontosMetas = Math.min(metasConcluidasHoje * 15, 30) + metasMovimentadasHoje * 5;
-
-  const temAtividadeHoje =
-    pontosHabitos !== null || metasConcluidasHoje > 0 || metasMovimentadasHoje > 0;
-
-  const scoreDiario = temAtividadeHoje
-    ? Math.min(Math.round((pontosHabitos ?? 0) + pontosMetas), 100)
-    : null;
+  // Usa a mesma fórmula de calcularScoreDoDia (hábitos + metas + tarefas),
+  // compartilhada com os gráficos "Últimos 7 dias" e "Constância" abaixo.
+  const scoreHoje = calcularScoreDoDia(hoje);
+  const scoreDiario = scoreHoje.score;
+  const temAtividadeHoje = scoreDiario !== null;
 
   function corDoScore(score: number | null): string {
     if (score === null) return "#5A6172";
@@ -232,22 +256,27 @@ export default function DashboardPage() {
 
   function explicacaoDoScore(): string {
     if (!temAtividadeHoje) {
-      return "Cadastre hábitos ou avance em uma meta para começar a pontuar hoje.";
+      return "Cadastre hábitos, avance uma meta ou conclua uma tarefa para começar a pontuar hoje.";
     }
 
     const partes: string[] = [];
 
-    if (totalHoje > 0) {
-      partes.push(`${feitosHoje} de ${totalHoje} hábitos concluídos`);
+    if (scoreHoje.totalHabitos > 0) {
+      partes.push(`${scoreHoje.feitosHabitos} de ${scoreHoje.totalHabitos} hábitos concluídos`);
     }
-    if (metasConcluidasHoje > 0) {
+    if (scoreHoje.metasConcluidas > 0) {
       partes.push(
-        `${metasConcluidasHoje} ${metasConcluidasHoje === 1 ? "meta concluída" : "metas concluídas"}`
+        `${scoreHoje.metasConcluidas} ${scoreHoje.metasConcluidas === 1 ? "meta concluída" : "metas concluídas"}`
       );
     }
-    if (metasMovimentadasHoje > 0) {
+    if (scoreHoje.metasMovimentadas > 0) {
       partes.push(
-        `${metasMovimentadasHoje} ${metasMovimentadasHoje === 1 ? "meta avançou" : "metas avançaram"}`
+        `${scoreHoje.metasMovimentadas} ${scoreHoje.metasMovimentadas === 1 ? "meta avançou" : "metas avançaram"}`
+      );
+    }
+    if (scoreHoje.tarefasConcluidas > 0) {
+      partes.push(
+        `${scoreHoje.tarefasConcluidas} ${scoreHoje.tarefasConcluidas === 1 ? "tarefa concluída" : "tarefas concluídas"}`
       );
     }
 
@@ -259,20 +288,14 @@ export default function DashboardPage() {
     return `Ainda dá tempo de melhorar hoje. ${resumo}.`;
   }
 
-  // Monta os dados do calendário de constância (90 dias, intensidade pelo % de hábitos cumpridos)
-  const diasCalendario = dias90.map((dia) => {
-    const logsDoDia = logs90dias.filter((l) => l.date === dia && l.done);
-    const total = habits.length;
-    const feitos = logsDoDia.length;
-    const pct = total > 0 ? feitos / total : 0;
-    return { dia, feitos, total, pct };
-  });
+  // Monta os dados do calendário de constância (90 dias, intensidade pelo score combinado do dia)
+  const diasCalendario = dias90.map((dia) => calcularScoreDoDia(dia));
 
-  function corIntensidade(pct: number, total: number): string {
-    if (total === 0) return "#161B26"; // sem hábitos cadastrados ainda nesse período
-    if (pct === 0) return "#1F2530";
-    if (pct < 0.5) return "#134E48";
-    if (pct < 1) return "#1E8F80";
+  function corIntensidade(score: number | null): string {
+    if (score === null) return "#161B26"; // sem nenhuma atividade registrada nesse dia
+    if (score === 0) return "#1F2530";
+    if (score < 40) return "#134E48";
+    if (score < 80) return "#1E8F80";
     return "#2DD4BF";
   }
 
@@ -792,19 +815,30 @@ export default function DashboardPage() {
               Últimos 7 dias
             </h2>
             <div className="flex items-end justify-between gap-2">
-              {logsPorDia7.map(({ dia, pct, feitos, total }) => {
-                const data = new Date(dia + "T12:00:00");
-                const isHoje = dia === hoje;
+              {atividadePorDia7.map((info) => {
+                const data = new Date(info.dia + "T12:00:00");
+                const isHoje = info.dia === hoje;
+                const titulo = [
+                  info.totalHabitos > 0
+                    ? `${info.feitosHabitos}/${info.totalHabitos} hábitos`
+                    : null,
+                  info.metasConcluidas > 0 ? `${info.metasConcluidas} metas concluídas` : null,
+                  info.metasMovimentadas > 0 ? `${info.metasMovimentadas} metas avançaram` : null,
+                  info.tarefasConcluidas > 0 ? `${info.tarefasConcluidas} tarefas concluídas` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Sem atividade";
                 return (
-                  <div key={dia} className="flex flex-1 flex-col items-center gap-2">
+                  <div key={info.dia} className="flex flex-1 flex-col items-center gap-2">
                     <div className="flex h-20 w-full items-end overflow-hidden rounded-md bg-base">
                       <div
                         className="w-full rounded-md transition-all"
                         style={{
-                          height: `${Math.max(pct * 100, total === 0 ? 0 : 6)}%`,
-                          backgroundColor: pct === 1 && total > 0 ? "#2DD4BF" : "#5A6172",
+                          height: `${info.score === null ? 0 : Math.max(info.score, 6)}%`,
+                          backgroundColor:
+                            info.score !== null && info.score >= 80 ? "#2DD4BF" : "#5A6172",
                         }}
-                        title={`${feitos}/${total}`}
+                        title={titulo}
                       />
                     </div>
                     <span
@@ -820,7 +854,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Calendário de constância — últimos 90 dias */}
+          {/* Calendário de constância — últimos 90 dias, combinando hábitos, metas e tarefas */}
           <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-ink">
@@ -836,18 +870,28 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
-              {diasCalendario.map(({ dia, feitos, total, pct }) => {
-                const data = new Date(dia + "T12:00:00");
+              {diasCalendario.map((info) => {
+                const data = new Date(info.dia + "T12:00:00");
                 const label = data.toLocaleDateString("pt-BR", {
                   day: "2-digit",
                   month: "short",
                 });
+                const titulo = [
+                  info.totalHabitos > 0
+                    ? `${info.feitosHabitos}/${info.totalHabitos} hábitos`
+                    : null,
+                  info.metasConcluidas > 0 ? `${info.metasConcluidas} metas concluídas` : null,
+                  info.metasMovimentadas > 0 ? `${info.metasMovimentadas} metas avançaram` : null,
+                  info.tarefasConcluidas > 0 ? `${info.tarefasConcluidas} tarefas concluídas` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Sem atividade";
                 return (
                   <div
-                    key={dia}
-                    title={`${label}: ${feitos}/${total} hábitos`}
+                    key={info.dia}
+                    title={`${label}: ${titulo}`}
                     className="aspect-square w-full rounded-sm"
-                    style={{ backgroundColor: corIntensidade(pct, total) }}
+                    style={{ backgroundColor: corIntensidade(info.score) }}
                   />
                 );
               })}
