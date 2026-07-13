@@ -9,22 +9,7 @@ import {
   calcularMacrosPorQuantidade,
   extrairQuantidade,
 } from "@/lib/alimentos";
-
-const MULTIPLICADORES: Record<ActivityLevel, number> = {
-  sedentario: 1.2,
-  leve: 1.375,
-  moderado: 1.55,
-  intenso: 1.725,
-  muito_intenso: 1.9,
-};
-
-const LABEL_ATIVIDADE: Record<ActivityLevel, string> = {
-  sedentario: "Sedentário (pouco ou nenhum exercício)",
-  leve: "Leve (1-3x por semana)",
-  moderado: "Moderado (3-5x por semana)",
-  intenso: "Intenso (6-7x por semana)",
-  muito_intenso: "Muito intenso (2x ao dia / físico)",
-};
+import { MULTIPLICADORES, LABEL_ATIVIDADE, calcularTMB, calcularKcal } from "@/lib/nutricao";
 
 function hojeISO(): string {
   const d = new Date();
@@ -32,15 +17,6 @@ function hojeISO(): string {
   const mes = String(d.getMonth() + 1).padStart(2, "0");
   const dia = String(d.getDate()).padStart(2, "0");
   return `${ano}-${mes}-${dia}`;
-}
-
-function calcularTMB(m: BodyMetrics): number {
-  const base = 10 * m.weight_kg + 6.25 * m.height_cm - 5 * m.age;
-  return m.sex === "m" ? base + 5 : base - 161;
-}
-
-function calcularKcal(protein_g: number, carb_g: number, fat_g: number): number {
-  return protein_g * 4 + carb_g * 4 + fat_g * 9;
 }
 
 type ItemFormState = {
