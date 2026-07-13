@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import DietaView from "@/components/DietaView";
@@ -28,8 +29,18 @@ function formatarDataHora(iso: string): string {
 }
 
 export default function TreinosPage() {
+  return (
+    <Suspense fallback={null}>
+      <TreinosConteudo />
+    </Suspense>
+  );
+}
+
+function TreinosConteudo() {
   const supabase = createClient();
-  const [aba, setAba] = useState<"treinos" | "dieta">("treinos");
+  const searchParams = useSearchParams();
+  const abaInicial = searchParams.get("aba") === "dieta" ? "dieta" : "treinos";
+  const [aba, setAba] = useState<"treinos" | "dieta">(abaInicial);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exerciciosPorTreino, setExerciciosPorTreino] = useState<Record<string, WorkoutExercise[]>>({});
   const [sessoes, setSessoes] = useState<WorkoutSession[]>([]);
