@@ -113,8 +113,55 @@ export const ALIMENTOS: AlimentoBase[] = [
 
   // Bebidas
   { nome: "Café sem açúcar", kcal: 2, protein_g: 0.1, carb_g: 0.0, fat_g: 0.0 },
+  { nome: "Café com açúcar", kcal: 20, protein_g: 0.1, carb_g: 5.0, fat_g: 0.0 },
+  { nome: "Café com leite sem açúcar", kcal: 38, protein_g: 1.9, carb_g: 3.0, fat_g: 1.9 },
+  { nome: "Café com leite e açúcar", kcal: 55, protein_g: 1.7, carb_g: 7.5, fat_g: 1.7 },
+  { nome: "Cappuccino", kcal: 65, protein_g: 2.5, carb_g: 8.0, fat_g: 2.5 },
+  { nome: "Chá sem açúcar", kcal: 1, protein_g: 0.0, carb_g: 0.2, fat_g: 0.0 },
+  { nome: "Achocolatado pronto (caixinha)", kcal: 65, protein_g: 1.4, carb_g: 11.0, fat_g: 1.6 },
+  { nome: "Leite com achocolatado em pó", kcal: 85, protein_g: 3.0, carb_g: 13.0, fat_g: 2.5 },
+  { nome: "Vitamina de banana com leite", kcal: 85, protein_g: 2.8, carb_g: 14.0, fat_g: 2.0 },
   { nome: "Suco de laranja natural", kcal: 45, protein_g: 0.7, carb_g: 10.4, fat_g: 0.2 },
+  { nome: "Suco de laranja com açúcar", kcal: 55, protein_g: 0.5, carb_g: 13.5, fat_g: 0.1 },
   { nome: "Refrigerante comum", kcal: 42, protein_g: 0.0, carb_g: 10.6, fat_g: 0.0 },
+  { nome: "Refrigerante zero", kcal: 0.3, protein_g: 0.0, carb_g: 0.1, fat_g: 0.0 },
+  { nome: "Cerveja pilsen", kcal: 43, protein_g: 0.5, carb_g: 3.6, fat_g: 0.0 },
+
+  // Pães e lanches do dia a dia
+  { nome: "Pão com manteiga", kcal: 330, protein_g: 8.5, carb_g: 55.0, fat_g: 10.0 },
+  { nome: "Pão com margarina", kcal: 320, protein_g: 8.3, carb_g: 55.0, fat_g: 9.0 },
+  { nome: "Pão na chapa", kcal: 335, protein_g: 8.6, carb_g: 55.0, fat_g: 10.5 },
+  { nome: "Misto quente", kcal: 290, protein_g: 12.0, carb_g: 32.0, fat_g: 13.0 },
+  { nome: "Pão de queijo", kcal: 350, protein_g: 6.0, carb_g: 34.0, fat_g: 21.0 },
+  { nome: "Pizza de mussarela", kcal: 266, protein_g: 11.0, carb_g: 33.0, fat_g: 10.0 },
+  { nome: "Hambúrguer caseiro com queijo", kcal: 295, protein_g: 17.0, carb_g: 24.0, fat_g: 15.0 },
+  { nome: "Cachorro-quente completo", kcal: 250, protein_g: 9.0, carb_g: 24.0, fat_g: 13.0 },
+  { nome: "Coxinha de frango frita", kcal: 300, protein_g: 9.0, carb_g: 28.0, fat_g: 17.0 },
+  { nome: "Pastel de carne frito", kcal: 320, protein_g: 8.0, carb_g: 30.0, fat_g: 19.0 },
+  { nome: "Esfiha de carne aberta", kcal: 260, protein_g: 10.0, carb_g: 28.0, fat_g: 12.0 },
+  { nome: "Sanduíche natural de frango", kcal: 200, protein_g: 12.0, carb_g: 22.0, fat_g: 7.0 },
+  { nome: "Torrada integral", kcal: 407, protein_g: 12.0, carb_g: 74.0, fat_g: 6.5 },
+  { nome: "Tapioca com queijo e coco", kcal: 210, protein_g: 5.0, carb_g: 33.0, fat_g: 7.0 },
+
+  // Doces e sobremesas
+  { nome: "Bolo simples", kcal: 371, protein_g: 5.6, carb_g: 55.0, fat_g: 14.0 },
+  { nome: "Brigadeiro", kcal: 411, protein_g: 4.5, carb_g: 60.0, fat_g: 17.0 },
+  { nome: "Pudim de leite", kcal: 205, protein_g: 5.0, carb_g: 32.0, fat_g: 6.0 },
+  { nome: "Sorvete de massa", kcal: 207, protein_g: 3.5, carb_g: 24.0, fat_g: 11.0 },
+  { nome: "Açaí puro (polpa)", kcal: 58, protein_g: 0.8, carb_g: 6.2, fat_g: 3.9 },
+  { nome: "Açaí na tigela com granola e banana", kcal: 150, protein_g: 2.0, carb_g: 24.0, fat_g: 5.0 },
+
+  // Salgados e frituras
+  { nome: "Batata frita", kcal: 312, protein_g: 3.4, carb_g: 41.0, fat_g: 15.0 },
+  { nome: "Pipoca de sal (sem óleo)", kcal: 375, protein_g: 11.0, carb_g: 78.0, fat_g: 4.5 },
+  { nome: "Pipoca amanteigada", kcal: 480, protein_g: 8.0, carb_g: 57.0, fat_g: 27.0 },
+
+  // Pratos prontos e refeições comuns
+  { nome: "Omelete de queijo", kcal: 235, protein_g: 16.0, carb_g: 1.5, fat_g: 18.0 },
+  { nome: "Feijoada", kcal: 220, protein_g: 14.0, carb_g: 12.0, fat_g: 13.0 },
+  { nome: "Strogonoff de frango", kcal: 195, protein_g: 14.0, carb_g: 8.0, fat_g: 12.0 },
+  { nome: "Lasanha à bolonhesa", kcal: 190, protein_g: 9.0, carb_g: 18.0, fat_g: 9.0 },
+  { nome: "Salada de frutas", kcal: 55, protein_g: 0.6, carb_g: 14.0, fat_g: 0.2 },
 ];
 
 function normalizar(texto: string): string {
