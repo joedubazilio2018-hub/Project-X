@@ -3,6 +3,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { BodyMetrics, Meal, MealItem, Sex, ActivityLevel } from "@/types/database";
+import {
+  type AlimentoBase,
+  buscarAlimentos,
+  calcularMacrosPorQuantidade,
+  extrairQuantidade,
+} from "@/lib/alimentos";
 
 const MULTIPLICADORES: Record<ActivityLevel, number> = {
   sedentario: 1.2,
@@ -37,6 +43,16 @@ function calcularKcal(protein_g: number, carb_g: number, fat_g: number): number 
   return protein_g * 4 + carb_g * 4 + fat_g * 9;
 }
 
+type ItemFormState = {
+  name: string;
+  gramas: string;
+  protein: string;
+  carb: string;
+  fat: string;
+};
+
+const ITEM_FORM_VAZIO: ItemFormState = { name: "", gramas: "", protein: "", carb: "", fat: "" };
+
 export default function DietaView() {
   const supabase = createClient();
   const hoje = hojeISO();
@@ -57,7 +73,10 @@ export default function DietaView() {
   const [novaRefeicaoNome, setNovaRefeicaoNome] = useState("");
   const [mostrarFormRefeicao, setMostrarFormRefeicao] = useState(false);
 
-  const [itemForm, setItemForm] = useState<Record<string, { name: string; protein: string; carb: string; fat: string }>>({});
+  const [itemForm, setItemForm] = useState<Record<string, ItemFormState>>({});
+  const [sugestoes, setSugestoes] = useState<Record<string, AlimentoBase[]>>({});
+  const [sugestaoAberta, setSugestaoAberta] = useState<string | null>(null);
+  const [alimentoSelecionado, setAlimentoSelecionado] = useState<Record<string, AlimentoBase | null>>({});
 
   const [itemEditando, setItemEditando] = useState<{
     id: string;
@@ -169,16 +188,89 @@ export default function DietaView() {
     carregar();
   }
 
-  function atualizarItemForm(mealId: string, campo: "name" | "protein" | "carb" | "fat", valor: string) {
+  // Busca no banco local de alimentos enquanto o usuário digita o nome do
+  // item. Se reconhecer o alimento (e a quantidade em gramas, quando
+  // digitada junto, ex: "arroz branco 150g"), já preenche proteína,
+  // carboidrato e gordura automaticamente.
+  function lidarComNome(mealId: string, valor: string) {
+    const formAtual = itemForm[mealId] ?? ITEM_FORM_VAZIO;
+    const { termo, gramas: gramasDoTexto } = extrairQuantidade(valor);
+    const resultados = termo.length >= 2 ? buscarAlimentos(termo) : [];
+
+    setSugestoes((s) => ({ ...s, [mealId]: resultados }));
+    setSugestaoAberta(resultados.length > 0 ? mealId : null);
+
+    let gramas = formAtual.gramas;
+    let protein = formAtual.protein;
+    let carb = formAtual.carb;
+    let fat = formAtual.fat;
+
+    if (gramasDoTexto !== null) {
+      gramas = String(gramasDoTexto);
+    }
+
+    if (resultados.length > 0) {
+      const gramasParaCalculo = gramasDoTexto ?? (parseFloat(gramas) || 100);
+      const macros = calcularMacrosPorQuantidade(resultados[0], gramasParaCalculo);
+      protein = String(macros.protein_g);
+      carb = String(macros.carb_g);
+      fat = String(macros.fat_g);
+      setAlimentoSelecionado((s) => ({ ...s, [mealId]: resultados[0] }));
+    }
+
+    setItemForm((atual) => ({
+      ...atual,
+      [mealId]: { name: valor, gramas, protein, carb, fat },
+    }));
+  }
+
+  function selecionarSugestao(mealId: string, alimento: AlimentoBase) {
+    const formAtual = itemForm[mealId] ?? ITEM_FORM_VAZIO;
+    const gramas = parseFloat(formAtual.gramas) || 100;
+    const macros = calcularMacrosPorQuantidade(alimento, gramas);
+
     setItemForm((atual) => ({
       ...atual,
       [mealId]: {
-        name: atual[mealId]?.name ?? "",
-        protein: atual[mealId]?.protein ?? "",
-        carb: atual[mealId]?.carb ?? "",
-        fat: atual[mealId]?.fat ?? "",
-        [campo]: valor,
+        name: alimento.nome,
+        gramas: String(gramas),
+        protein: String(macros.protein_g),
+        carb: String(macros.carb_g),
+        fat: String(macros.fat_g),
       },
+    }));
+    setAlimentoSelecionado((s) => ({ ...s, [mealId]: alimento }));
+    setSugestoes((s) => ({ ...s, [mealId]: [] }));
+    setSugestaoAberta(null);
+  }
+
+  function atualizarGramas(mealId: string, valor: string) {
+    const formAtual = itemForm[mealId] ?? ITEM_FORM_VAZIO;
+    const alimento = alimentoSelecionado[mealId];
+    let protein = formAtual.protein;
+    let carb = formAtual.carb;
+    let fat = formAtual.fat;
+
+    if (alimento) {
+      const macros = calcularMacrosPorQuantidade(alimento, parseFloat(valor) || 0);
+      protein = String(macros.protein_g);
+      carb = String(macros.carb_g);
+      fat = String(macros.fat_g);
+    }
+
+    setItemForm((atual) => ({
+      ...atual,
+      [mealId]: { ...formAtual, gramas: valor, protein, carb, fat },
+    }));
+  }
+
+  function atualizarMacroManual(mealId: string, campo: "protein" | "carb" | "fat", valor: string) {
+    // edição manual encerra o vínculo automático com o alimento selecionado,
+    // pra não sobrescrever o ajuste do usuário se ele mudar a quantidade depois
+    setAlimentoSelecionado((s) => ({ ...s, [mealId]: null }));
+    setItemForm((atual) => ({
+      ...atual,
+      [mealId]: { ...(atual[mealId] ?? ITEM_FORM_VAZIO), [campo]: valor },
     }));
   }
 
@@ -199,7 +291,9 @@ export default function DietaView() {
       fat_g: Number(form.fat) || 0,
     });
 
-    setItemForm((atual) => ({ ...atual, [mealId]: { name: "", protein: "", carb: "", fat: "" } }));
+    setItemForm((atual) => ({ ...atual, [mealId]: ITEM_FORM_VAZIO }));
+    setAlimentoSelecionado((s) => ({ ...s, [mealId]: null }));
+    setSugestoes((s) => ({ ...s, [mealId]: [] }));
     carregar();
   }
 
@@ -395,7 +489,13 @@ export default function DietaView() {
                 (acc, i) => acc + calcularKcal(i.protein_g, i.carb_g, i.fat_g),
                 0
               );
-              const form = itemForm[meal.id] ?? { name: "", protein: "", carb: "", fat: "" };
+              const form = itemForm[meal.id] ?? ITEM_FORM_VAZIO;
+              const listaSugestoes = sugestoes[meal.id] ?? [];
+              const kcalPreview = calcularKcal(
+                Number(form.protein) || 0,
+                Number(form.carb) || 0,
+                Number(form.fat) || 0
+              );
 
               return (
                 <div key={meal.id} className="rounded-xl border border-base-border bg-base-surface p-4">
@@ -490,29 +590,62 @@ export default function DietaView() {
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <div className="relative min-w-[140px] flex-1">
+                      <input
+                        value={form.name}
+                        onChange={(e) => lidarComNome(meal.id, e.target.value)}
+                        onFocus={() => listaSugestoes.length > 0 && setSugestaoAberta(meal.id)}
+                        onBlur={() =>
+                          setTimeout(
+                            () => setSugestaoAberta((atual) => (atual === meal.id ? null : atual)),
+                            150
+                          )
+                        }
+                        placeholder="Ex: arroz branco 150g"
+                        className="w-full rounded-md border border-base-border bg-base px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+                        autoComplete="off"
+                      />
+                      {sugestaoAberta === meal.id && listaSugestoes.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-base-border bg-base-surface shadow-lg">
+                          {listaSugestoes.map((alimento) => (
+                            <button
+                              key={alimento.nome}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => selecionarSugestao(meal.id, alimento)}
+                              className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-ink hover:bg-base"
+                            >
+                              <span>{alimento.nome}</span>
+                              <span className="text-ink-faint">{alimento.kcal} kcal/100g</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input
-                      value={form.name}
-                      onChange={(e) => atualizarItemForm(meal.id, "name", e.target.value)}
-                      placeholder="Item, ex: 150g de frango"
-                      className="min-w-[120px] flex-1 rounded-md border border-base-border bg-base px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+                      value={form.gramas}
+                      onChange={(e) => atualizarGramas(meal.id, e.target.value)}
+                      placeholder="Gramas"
+                      inputMode="decimal"
+                      className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
                     />
                     <input
                       value={form.protein}
-                      onChange={(e) => atualizarItemForm(meal.id, "protein", e.target.value)}
+                      onChange={(e) => atualizarMacroManual(meal.id, "protein", e.target.value)}
                       placeholder="Prot(g)"
                       inputMode="decimal"
                       className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
                     />
                     <input
                       value={form.carb}
-                      onChange={(e) => atualizarItemForm(meal.id, "carb", e.target.value)}
+                      onChange={(e) => atualizarMacroManual(meal.id, "carb", e.target.value)}
                       placeholder="Carb(g)"
                       inputMode="decimal"
                       className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
                     />
                     <input
                       value={form.fat}
-                      onChange={(e) => atualizarItemForm(meal.id, "fat", e.target.value)}
+                      onChange={(e) => atualizarMacroManual(meal.id, "fat", e.target.value)}
                       placeholder="Gord(g)"
                       inputMode="decimal"
                       className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-xs text-ink outline-none focus:border-accent"
@@ -524,6 +657,9 @@ export default function DietaView() {
                       + Item
                     </button>
                   </div>
+                  {(form.protein || form.carb || form.fat) && (
+                    <p className="mt-1 text-right text-[10px] text-ink-faint">≈ {Math.round(kcalPreview)} kcal</p>
+                  )}
                 </div>
               );
             })}
