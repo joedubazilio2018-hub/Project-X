@@ -9,6 +9,7 @@
 body {
   background-color: theme("colors.base.DEFAULT");
   color: theme("colors.ink.DEFAULT");
+  touch-action: manipulation;
 }
 
 ::selection {
