@@ -248,9 +248,9 @@ export default function DashboardPage() {
 
   function corDoScore(score: number | null): string {
     if (score === null) return "#5A6172";
-    if (score >= 80) return "#2DD4BF";
+    if (score >= 80) return "#E5E5E3";
     if (score >= 50) return "#34D399";
-    if (score >= 20) return "#F2B84B";
+    if (score >= 20) return "#C7C7C5";
     return "#FB7185";
   }
 
@@ -296,7 +296,7 @@ export default function DashboardPage() {
     if (score === 0) return "#1F2530";
     if (score < 40) return "#134E48";
     if (score < 80) return "#1E8F80";
-    return "#2DD4BF";
+    return "#E5E5E3";
   }
 
   // Monta a linha do tempo unificada, juntando eventos de hábitos, metas, diário e finanças
@@ -312,7 +312,7 @@ export default function DashboardPage() {
           criadoEm: log.created_at,
           tipo: "habito",
           texto: `Hábito concluído: ${habito?.name ?? "hábito"}`,
-          cor: "#2DD4BF",
+          cor: "#E5E5E3",
         });
       });
 
@@ -323,7 +323,7 @@ export default function DashboardPage() {
           criadoEm: goal.created_at,
           tipo: "meta",
           texto: `Meta concluída: ${goal.title}`,
-          cor: "#F2B84B",
+          cor: "#C7C7C5",
         });
       } else {
         eventos.push({
@@ -331,7 +331,7 @@ export default function DashboardPage() {
           criadoEm: goal.created_at,
           tipo: "meta",
           texto: `Meta criada: ${goal.title}`,
-          cor: "#F2B84B",
+          cor: "#C7C7C5",
         });
       }
     });
@@ -359,7 +359,7 @@ export default function DashboardPage() {
           t.type === "income"
             ? `Receita registrada: ${valorFormatado}`
             : `Despesa registrada: ${valorFormatado}`,
-        cor: t.type === "income" ? "#2DD4BF" : "#FB7185",
+        cor: t.type === "income" ? "#E5E5E3" : "#FB7185",
       });
     });
 
@@ -836,7 +836,7 @@ export default function DashboardPage() {
                         style={{
                           height: `${info.score === null ? 0 : Math.max(info.score, 6)}%`,
                           backgroundColor:
-                            info.score !== null && info.score >= 80 ? "#2DD4BF" : "#5A6172",
+                            info.score !== null && info.score >= 80 ? "#E5E5E3" : "#5A6172",
                         }}
                         title={titulo}
                       />
@@ -865,7 +865,7 @@ export default function DashboardPage() {
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1F2530" }} />
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#134E48" }} />
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1E8F80" }} />
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#2DD4BF" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#E5E5E3" }} />
                 <span>Mais</span>
               </div>
             </div>
