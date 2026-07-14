@@ -6,7 +6,7 @@ import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
 import type { Goal, GoalStatus, GoalCategory, GoalItem } from "@/types/database";
 
-const CORES = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
+const CORES = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
 
 const STATUS_LABEL: Record<GoalStatus, string> = {
   not_started: "Não iniciada",
@@ -15,9 +15,9 @@ const STATUS_LABEL: Record<GoalStatus, string> = {
 };
 
 const STATUS_COLOR: Record<GoalStatus, string> = {
-  not_started: "#5A6172",
-  in_progress: "#F2B84B",
-  done: "#2DD4BF",
+  not_started: "#57575B",
+  in_progress: "#C7C7C5",
+  done: "#E5E5E3",
 };
 
 const STATUS_ORDER: GoalStatus[] = ["in_progress", "not_started", "done"];
@@ -627,11 +627,11 @@ export default function MetasPage() {
                               color:
                                 goal.status === status
                                   ? STATUS_COLOR[status]
-                                  : "#5A6172",
+                                  : "#57575B",
                               border: `1px solid ${
                                 goal.status === status
                                   ? STATUS_COLOR[status]
-                                  : "#1F2530"
+                                  : "#2A2A2D"
                               }`,
                             }}
                           >
