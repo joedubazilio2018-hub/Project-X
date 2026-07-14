@@ -23,7 +23,7 @@ import type {
   FinancialGoal,
 } from "@/types/database";
 
-const CORES_CATEGORIA = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
+const CORES_CATEGORIA = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
 const LANCAMENTOS_POR_PAGINA = 50;
 
 function hojeISO(): string {
@@ -373,7 +373,7 @@ export default function FinancasPage() {
       .forEach((t) => {
         const cat = categories.find((c) => c.id === t.category_id);
         const nome = cat?.name ?? "Sem categoria";
-        const cor = cat?.color ?? "#5A6172";
+        const cor = cat?.color ?? "#57575B";
         if (!mapa[nome]) mapa[nome] = { name: nome, value: 0, color: cor };
         mapa[nome].value += t.amount;
       });
@@ -498,7 +498,7 @@ export default function FinancasPage() {
                     </Pie>
                     <Tooltip
                       formatter={(value: number) => formatarMoeda(value)}
-                      contentStyle={{ backgroundColor: "#12161F", border: "1px solid #1F2530", borderRadius: 8, color: "#E7EAF0" }}
+                      contentStyle={{ backgroundColor: "#16161B", border: "1px solid #2A2A2D", borderRadius: 8, color: "#F0F0EE" }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -509,14 +509,14 @@ export default function FinancasPage() {
               <h2 className="mb-3 text-sm font-semibold text-ink">Evolução do saldo (30 dias)</h2>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={dadosLinha}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1F2530" />
-                  <XAxis dataKey="dia" tick={{ fill: "#8B93A5", fontSize: 11 }} interval={4} />
-                  <YAxis tick={{ fill: "#8B93A5", fontSize: 11 }} width={50} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2D" />
+                  <XAxis dataKey="dia" tick={{ fill: "#9C9CA0", fontSize: 11 }} interval={4} />
+                  <YAxis tick={{ fill: "#9C9CA0", fontSize: 11 }} width={50} />
                   <Tooltip
                     formatter={(value: number) => formatarMoeda(value)}
-                    contentStyle={{ backgroundColor: "#12161F", border: "1px solid #1F2530", borderRadius: 8, color: "#E7EAF0" }}
+                    contentStyle={{ backgroundColor: "#16161B", border: "1px solid #2A2A2D", borderRadius: 8, color: "#F0F0EE" }}
                   />
-                  <Line type="monotone" dataKey="saldo" stroke="#2DD4BF" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="saldo" stroke="#E5E5E3" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -715,7 +715,7 @@ export default function FinancasPage() {
                               >
                                 ✓
                               </button>
-                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: cat?.color ?? "#5A6172" }} />
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: cat?.color ?? "#57575B" }} />
                               <div>
                                 <p className="text-sm text-ink">
                                   {t.description || cat?.name || "Lançamento"}
