@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Sora } from "next/font/google";
+import { Inter, Fraunces } from "next/font/google";
 import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
 import "./globals.css";
 
@@ -9,15 +9,15 @@ const inter = Inter({
   display: "swap",
 });
 
-const sora = Sora({
+const fraunces = Fraunces({
   subsets: ["latin"],
-  variable: "--font-sora",
-  weight: ["600", "700", "800"],
+  variable: "--font-fraunces",
+  weight: ["500", "600", "700"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Ascen",
+  title: "Ascese",
   description: "Acompanhamento pessoal de hábitos, metas, diário e finanças.",
   manifest: "/manifest.json",
   icons: {
@@ -27,12 +27,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Ascen",
+    title: "Ascese",
   },
 };
 
 export const viewport = {
-  themeColor: "#0B0E14",
+  themeColor: "#0A0A0B",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -45,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${sora.variable}`}>
+    <html lang="pt-BR" className={`${inter.variable} ${fraunces.variable}`}>
       <body className="font-sans antialiased">
         <RegistrarServiceWorker />
         {children}
