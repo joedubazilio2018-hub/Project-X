@@ -121,14 +121,20 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-mark.png"
+            alt="Ascese"
+            className="mx-auto mb-4 h-20 w-20 rounded-full border border-base-border object-cover"
+          />
           <h1 className="font-display text-2xl font-bold text-ink">
-            Ascen
+            Ascese
           </h1>
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-faint">
             by JB Group
           </p>
           <p className="mt-3 text-sm text-ink-muted">
-            Seu painel pessoal de hábitos, metas e rotina.
+            Hábitos, metas e rotina. Sem desculpas.
           </p>
         </div>
 
