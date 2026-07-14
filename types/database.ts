@@ -40,9 +40,10 @@ export type Goal = {
   user_id: string;
   title: string;
   description: string | null;
-  deadline: string | null; // YYYY-MM-DD
+  deadline: string | null;
   status: GoalStatus;
   category_id: string | null;
+  image_url: string | null;
   created_at: string;
   status_changed_at: string;
 };
