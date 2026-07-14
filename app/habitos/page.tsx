@@ -7,7 +7,7 @@ import BotaoNotificacao from "@/components/BotaoNotificacao";
 import SwipeRow from "@/components/SwipeRow";
 import type { Habit, HabitLog, HabitCategory } from "@/types/database";
 
-const CORES = ["#2DD4BF", "#F2B84B", "#FB7185", "#60A5FA", "#A78BFA", "#34D399"];
+const CORES = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
 
 function hojeISO(): string {
   const d = new Date();
