@@ -30,27 +30,25 @@ export default function MetasPage() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
-  // Novo item por meta (um campo de texto por card de meta)
   const [novoItemTexto, setNovoItemTexto] = useState<Record<string, string>>({});
-
-  // Itens da nova meta (um por linha, no formulário de criação)
   const [itensNovaMeta, setItensNovaMeta] = useState("");
 
-  // Form de nova meta
   const [mostrarForm, setMostrarForm] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [prazo, setPrazo] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
+  const [imagemUrl, setImagemUrl] = useState("");
 
-  // Edição de meta existente
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editTitulo, setEditTitulo] = useState("");
   const [editDescricao, setEditDescricao] = useState("");
   const [editPrazo, setEditPrazo] = useState("");
   const [editCategoriaId, setEditCategoriaId] = useState("");
+  const [editImagemUrl, setEditImagemUrl] = useState("");
 
-  // Form de categoria
+  const [visao, setVisao] = useState<"lista" | "sonhos">("lista");
+
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
   const [novaCategoriaNome, setNovaCategoriaNome] = useState("");
   const [editandoCategoriaId, setEditandoCategoriaId] = useState<string | null>(null);
@@ -81,7 +79,6 @@ export default function MetasPage() {
     carregar();
   }, [carregar]);
 
-  // ── Metas ──
   async function criarMeta(e: React.FormEvent) {
     e.preventDefault();
     if (!titulo.trim()) return;
@@ -99,6 +96,7 @@ export default function MetasPage() {
         description: descricao.trim() || null,
         deadline: prazo || null,
         category_id: categoriaId || null,
+        image_url: imagemUrl.trim() || null,
         status: "not_started",
       })
       .select()
@@ -124,13 +122,13 @@ export default function MetasPage() {
     setDescricao("");
     setPrazo("");
     setCategoriaId("");
+    setImagemUrl("");
     setItensNovaMeta("");
     setMostrarForm(false);
     setSalvando(false);
     carregar();
   }
 
-  // ── Itens (tópicos) de uma meta ──
   async function adicionarItem(goalId: string) {
     const texto = (novoItemTexto[goalId] || "").trim();
     if (!texto) return;
@@ -161,7 +159,6 @@ export default function MetasPage() {
     setItems(novosItems);
     await supabase.from("goal_items").update({ done: novoDone }).eq("id", item.id);
 
-    // Auto-completa (ou reabre) a meta quando todos os itens são marcados/desmarcados
     const itensDaMeta = novosItems.filter((i) => i.goal_id === item.goal_id);
     const meta = goals.find((g) => g.id === item.goal_id);
     if (itensDaMeta.length > 0 && meta) {
@@ -185,6 +182,7 @@ export default function MetasPage() {
     setEditDescricao(goal.description ?? "");
     setEditPrazo(goal.deadline ?? "");
     setEditCategoriaId(goal.category_id ?? "");
+    setEditImagemUrl(goal.image_url ?? "");
   }
 
   async function salvarEdicao(goalId: string) {
@@ -197,6 +195,7 @@ export default function MetasPage() {
         description: editDescricao.trim() || null,
         deadline: editPrazo || null,
         category_id: editCategoriaId || null,
+        image_url: editImagemUrl.trim() || null,
       })
       .eq("id", goalId);
 
@@ -216,7 +215,6 @@ export default function MetasPage() {
     await supabase.from("goals").delete().eq("id", goalId);
   }
 
-  // ── Categorias ──
   async function criarCategoria(e: React.FormEvent) {
     e.preventDefault();
     if (!novaCategoriaNome.trim()) return;
@@ -273,6 +271,33 @@ export default function MetasPage() {
         </p>
       </header>
 
+      <div className="mb-6 flex w-fit rounded-lg border border-base-border p-1">
+        <button
+          onClick={() => setVisao("lista")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            visao === "lista" ? "bg-ink text-base" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          Lista
+        </button>
+        <button
+          onClick={() => setVisao("sonhos")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            visao === "sonhos" ? "bg-ink text-base" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          Painel de Sonhos
+        </button>
+      </div>
+
+      {visao === "sonhos" && (
+        <p className="mb-6 font-display text-base italic text-ink-muted">
+          Aquilo que você mantém diante dos olhos, você caminha até alcançar.
+        </p>
+      )}
+
+      {visao === "lista" && (
+      <>
       {/* Categorias */}
       <section className="mb-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -405,6 +430,17 @@ export default function MetasPage() {
             rows={3}
             className="resize-none rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
+          <div>
+            <input
+              value={imagemUrl}
+              onChange={(e) => setImagemUrl(e.target.value)}
+              placeholder="Link de uma imagem que represente esse sonho (opcional)"
+              className="w-full rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            />
+            <p className="mt-1 text-xs text-ink-faint">
+              Aparece no Painel de Sonhos. Cole o link de qualquer imagem da web.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm text-ink-muted">Prazo (opcional):</label>
             <input
@@ -468,6 +504,12 @@ export default function MetasPage() {
                       rows={2}
                       placeholder="Descrição (opcional)"
                       className="resize-none rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      value={editImagemUrl}
+                      onChange={(e) => setEditImagemUrl(e.target.value)}
+                      placeholder="Link de uma imagem (opcional)"
+                      className="rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent"
                     />
                     <div className="flex flex-wrap items-center gap-3">
                       <input
@@ -547,7 +589,6 @@ export default function MetasPage() {
                         </p>
                       )}
 
-                      {/* Checklist de tópicos/tarefas da meta */}
                       {(() => {
                         const itensDaMeta = items
                           .filter((i) => i.goal_id === goal.id)
@@ -646,6 +687,65 @@ export default function MetasPage() {
             );
           })}
         </ul>
+      )}
+      </>
+      )}
+
+      {visao === "sonhos" && (
+        goalsOrdenadas.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-base-border p-8 text-center">
+            <p className="text-sm text-ink-muted">
+              Nenhum sonho no painel ainda. Volte pra "Lista" e adicione uma
+              imagem às suas metas pra elas aparecerem aqui.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {goalsOrdenadas.map((goal) => {
+              const cat = categories.find((c) => c.id === goal.category_id);
+              return (
+                <button
+                  key={goal.id}
+                  onClick={() => {
+                    setVisao("lista");
+                    iniciarEdicao(goal);
+                  }}
+                  className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-base-border bg-base-surface text-left"
+                >
+                  {goal.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={goal.image_url}
+                      alt={goal.title}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-base p-4">
+                      <span className="text-center text-xs text-ink-faint">
+                        {goal.title}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-3 pt-10">
+                    {cat && (
+                      <span className="mb-1 inline-block rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white">
+                        {cat.name}
+                      </span>
+                    )}
+                    <p className="line-clamp-2 text-sm font-semibold text-white">
+                      {goal.title}
+                    </p>
+                    {goal.status === "done" && (
+                      <span className="mt-1 inline-block text-[10px] font-semibold text-white/80">
+                        ✓ Concluída
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )
       )}
     </AppShell>
   );
