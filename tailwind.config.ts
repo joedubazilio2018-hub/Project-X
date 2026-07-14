@@ -9,30 +9,30 @@ const config: Config = {
     extend: {
       colors: {
         base: {
-          DEFAULT: "#0B0E14", // fundo principal, quase-preto azulado
-          surface: "#12161F", // cards e superfícies elevadas
-          border: "#1F2530",
+          DEFAULT: "#0A0A0B",
+          surface: "#16161B",
+          border: "#2A2A2D",
         },
         ink: {
-          DEFAULT: "#E7EAF0", // texto principal
-          muted: "#8B93A5", // texto secundário
-          faint: "#5A6172",
+          DEFAULT: "#F0F0EE",
+          muted: "#9C9CA0",
+          faint: "#57575B",
         },
         accent: {
-          DEFAULT: "#2DD4BF", // teal — progresso, positivo
-          dim: "#134E48",
+          DEFAULT: "#E5E5E3",
+          dim: "#242426",
         },
         warn: {
-          DEFAULT: "#FB7185", // coral — alerta, negativo, despesa
-          dim: "#4A1D24",
+          DEFAULT: "#B0B0AD",
+          dim: "#242422",
         },
         gold: {
-          DEFAULT: "#F2B84B", // metas, destaque secundário
+          DEFAULT: "#C7C7C5",
         },
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-sora)", "system-ui", "sans-serif"],
+        display: ["var(--font-fraunces)", "Georgia", "serif"],
       },
       borderRadius: {
         xl: "14px",
