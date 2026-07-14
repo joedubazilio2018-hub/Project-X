@@ -247,11 +247,11 @@ export default function DashboardPage() {
   const temAtividadeHoje = scoreDiario !== null;
 
   function corDoScore(score: number | null): string {
-    if (score === null) return "#5A6172";
+    if (score === null) return "#57575B";
     if (score >= 80) return "#E5E5E3";
-    if (score >= 50) return "#34D399";
+    if (score >= 50) return "#3A3A3D";
     if (score >= 20) return "#C7C7C5";
-    return "#FB7185";
+    return "#B0B0AD";
   }
 
   function explicacaoDoScore(): string {
@@ -293,7 +293,7 @@ export default function DashboardPage() {
 
   function corIntensidade(score: number | null): string {
     if (score === null) return "#161B26"; // sem nenhuma atividade registrada nesse dia
-    if (score === 0) return "#1F2530";
+    if (score === 0) return "#2A2A2D";
     if (score < 40) return "#134E48";
     if (score < 80) return "#1E8F80";
     return "#E5E5E3";
@@ -342,7 +342,7 @@ export default function DashboardPage() {
         criadoEm: entry.created_at,
         tipo: "diario",
         texto: "Entrada no diário",
-        cor: "#A78BFA",
+        cor: "#71717A",
       });
     });
 
@@ -359,7 +359,7 @@ export default function DashboardPage() {
           t.type === "income"
             ? `Receita registrada: ${valorFormatado}`
             : `Despesa registrada: ${valorFormatado}`,
-        cor: t.type === "income" ? "#E5E5E3" : "#FB7185",
+        cor: t.type === "income" ? "#E5E5E3" : "#B0B0AD",
       });
     });
 
@@ -836,7 +836,7 @@ export default function DashboardPage() {
                         style={{
                           height: `${info.score === null ? 0 : Math.max(info.score, 6)}%`,
                           backgroundColor:
-                            info.score !== null && info.score >= 80 ? "#E5E5E3" : "#5A6172",
+                            info.score !== null && info.score >= 80 ? "#E5E5E3" : "#57575B",
                         }}
                         title={titulo}
                       />
@@ -862,7 +862,7 @@ export default function DashboardPage() {
               </h2>
               <div className="flex items-center gap-1.5 text-xs text-ink-faint">
                 <span>Menos</span>
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1F2530" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#2A2A2D" }} />
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#134E48" }} />
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1E8F80" }} />
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#E5E5E3" }} />
