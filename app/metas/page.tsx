@@ -8,6 +8,10 @@ import type { Goal, GoalStatus, GoalCategory, GoalItem } from "@/types/database"
 
 const CORES = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
 
+function formatarMoeda(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 const STATUS_LABEL: Record<GoalStatus, string> = {
   not_started: "Não iniciada",
   in_progress: "Em andamento",
@@ -38,14 +42,22 @@ export default function MetasPage() {
   const [descricao, setDescricao] = useState("");
   const [prazo, setPrazo] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
-  const [imagemUrl, setImagemUrl] = useState("");
+  const [valorAlvo, setValorAlvo] = useState("");
+  const [imagemArquivo, setImagemArquivo] = useState<File | null>(null);
+  const [imagemPreview, setImagemPreview] = useState<string>("");
+  const [enviandoImagem, setEnviandoImagem] = useState(false);
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editTitulo, setEditTitulo] = useState("");
   const [editDescricao, setEditDescricao] = useState("");
   const [editPrazo, setEditPrazo] = useState("");
   const [editCategoriaId, setEditCategoriaId] = useState("");
+  const [editValorAlvo, setEditValorAlvo] = useState("");
   const [editImagemUrl, setEditImagemUrl] = useState("");
+  const [editImagemArquivo, setEditImagemArquivo] = useState<File | null>(null);
+  const [editImagemPreview, setEditImagemPreview] = useState<string>("");
+
+  const [valorGuardar, setValorGuardar] = useState<Record<string, string>>({});
 
   const [visao, setVisao] = useState<"lista" | "sonhos">("lista");
 
@@ -79,6 +91,32 @@ export default function MetasPage() {
     carregar();
   }, [carregar]);
 
+  async function enviarImagemMeta(file: File, userId: string): Promise<string | null> {
+    const ext = file.name.split(".").pop() || "jpg";
+    const nomeArquivo = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("goal-images")
+      .upload(nomeArquivo, file, { cacheControl: "3600", upsert: false });
+    if (error) {
+      console.error("Erro ao enviar imagem:", error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from("goal-images").getPublicUrl(nomeArquivo);
+    return data.publicUrl;
+  }
+
+  function handleImagemChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setImagemArquivo(file);
+    setImagemPreview(file ? URL.createObjectURL(file) : "");
+  }
+
+  function handleEditImagemChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setEditImagemArquivo(file);
+    setEditImagemPreview(file ? URL.createObjectURL(file) : "");
+  }
+
   async function criarMeta(e: React.FormEvent) {
     e.preventDefault();
     if (!titulo.trim()) return;
@@ -88,6 +126,15 @@ export default function MetasPage() {
     const userId = userData.user?.id;
     if (!userId) return;
 
+    let urlImagem: string | null = null;
+    if (imagemArquivo) {
+      setEnviandoImagem(true);
+      urlImagem = await enviarImagemMeta(imagemArquivo, userId);
+      setEnviandoImagem(false);
+    }
+
+    const valorAlvoNum = parseFloat(valorAlvo.replace(",", "."));
+
     const { data: novaMeta } = await supabase
       .from("goals")
       .insert({
@@ -96,7 +143,9 @@ export default function MetasPage() {
         description: descricao.trim() || null,
         deadline: prazo || null,
         category_id: categoriaId || null,
-        image_url: imagemUrl.trim() || null,
+        image_url: urlImagem,
+        target_amount: valorAlvoNum > 0 ? valorAlvoNum : null,
+        current_amount: 0,
         status: "not_started",
       })
       .select()
@@ -122,7 +171,9 @@ export default function MetasPage() {
     setDescricao("");
     setPrazo("");
     setCategoriaId("");
-    setImagemUrl("");
+    setValorAlvo("");
+    setImagemArquivo(null);
+    setImagemPreview("");
     setItensNovaMeta("");
     setMostrarForm(false);
     setSalvando(false);
@@ -182,11 +233,28 @@ export default function MetasPage() {
     setEditDescricao(goal.description ?? "");
     setEditPrazo(goal.deadline ?? "");
     setEditCategoriaId(goal.category_id ?? "");
+    setEditValorAlvo(goal.target_amount ? String(goal.target_amount) : "");
     setEditImagemUrl(goal.image_url ?? "");
+    setEditImagemArquivo(null);
+    setEditImagemPreview("");
   }
 
   async function salvarEdicao(goalId: string) {
     if (!editTitulo.trim()) return;
+
+    let urlImagem = editImagemUrl || null;
+    if (editImagemArquivo) {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (userId) {
+        setEnviandoImagem(true);
+        const novaUrl = await enviarImagemMeta(editImagemArquivo, userId);
+        setEnviandoImagem(false);
+        if (novaUrl) urlImagem = novaUrl;
+      }
+    }
+
+    const valorAlvoNum = parseFloat(editValorAlvo.replace(",", "."));
 
     await supabase
       .from("goals")
@@ -195,12 +263,30 @@ export default function MetasPage() {
         description: editDescricao.trim() || null,
         deadline: editPrazo || null,
         category_id: editCategoriaId || null,
-        image_url: editImagemUrl.trim() || null,
+        target_amount: valorAlvoNum > 0 ? valorAlvoNum : null,
+        image_url: urlImagem,
       })
       .eq("id", goalId);
 
     setEditandoId(null);
+    setEditImagemArquivo(null);
+    setEditImagemPreview("");
     carregar();
+  }
+
+  async function guardarDinheiro(goal: Goal) {
+    const bruto = (valorGuardar[goal.id] || "").replace(",", ".");
+    const valor = parseFloat(bruto);
+    if (!valor || valor <= 0) return;
+
+    const novoValor = Number((Number(goal.current_amount || 0) + valor).toFixed(2));
+
+    setGoals((prev) =>
+      prev.map((g) => (g.id === goal.id ? { ...g, current_amount: novoValor } : g))
+    );
+    setValorGuardar((prev) => ({ ...prev, [goal.id]: "" }));
+
+    await supabase.from("goals").update({ current_amount: novoValor }).eq("id", goal.id);
   }
 
   async function mudarStatus(goalId: string, status: GoalStatus) {
@@ -431,14 +517,36 @@ export default function MetasPage() {
             className="resize-none rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
           <div>
+            <label className="mb-1 block text-xs text-ink-muted">
+              Foto do sonho (opcional)
+            </label>
             <input
-              value={imagemUrl}
-              onChange={(e) => setImagemUrl(e.target.value)}
-              placeholder="Link de uma imagem que represente esse sonho (opcional)"
+              type="file"
+              accept="image/*"
+              onChange={handleImagemChange}
+              className="block w-full text-xs text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-xs file:font-semibold file:text-base"
+            />
+            {imagemPreview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imagemPreview}
+                alt="Pré-visualização"
+                className="mt-2 h-28 w-28 rounded-lg object-cover"
+              />
+            )}
+            <p className="mt-1 text-xs text-ink-faint">Aparece no Painel de Sonhos.</p>
+          </div>
+          <div>
+            <input
+              value={valorAlvo}
+              onChange={(e) => setValorAlvo(e.target.value)}
+              placeholder="Valor alvo em R$ (opcional) — se essa meta envolve guardar dinheiro"
+              inputMode="decimal"
               className="w-full rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
             <p className="mt-1 text-xs text-ink-faint">
-              Aparece no Painel de Sonhos. Cole o link de qualquer imagem da web.
+              Se preenchido, a meta ganha uma barra de progresso alimentada por
+              dinheiro guardado.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -464,10 +572,10 @@ export default function MetasPage() {
           </div>
           <button
             type="submit"
-            disabled={salvando}
+            disabled={salvando || enviandoImagem}
             className="self-start rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            Salvar meta
+            {enviandoImagem ? "Enviando foto..." : "Salvar meta"}
           </button>
         </form>
       )}
@@ -505,10 +613,33 @@ export default function MetasPage() {
                       placeholder="Descrição (opcional)"
                       className="resize-none rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent"
                     />
+                    <div>
+                      <label className="mb-1 block text-xs text-ink-muted">
+                        Foto do sonho
+                      </label>
+                      {(editImagemPreview || editImagemUrl) && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={editImagemPreview || editImagemUrl}
+                          alt="Foto atual"
+                          className="mb-2 h-24 w-24 rounded-lg object-cover"
+                        />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditImagemChange}
+                        className="block w-full text-xs text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-xs file:font-semibold file:text-base"
+                      />
+                      <p className="mt-1 text-xs text-ink-faint">
+                        Escolha um arquivo só se quiser trocar a foto atual.
+                      </p>
+                    </div>
                     <input
-                      value={editImagemUrl}
-                      onChange={(e) => setEditImagemUrl(e.target.value)}
-                      placeholder="Link de uma imagem (opcional)"
+                      value={editValorAlvo}
+                      onChange={(e) => setEditValorAlvo(e.target.value)}
+                      placeholder="Valor alvo em R$ (opcional)"
+                      inputMode="decimal"
                       className="rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent"
                     />
                     <div className="flex flex-wrap items-center gap-3">
@@ -534,7 +665,8 @@ export default function MetasPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => salvarEdicao(goal.id)}
-                        className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base"
+                        disabled={enviandoImagem}
+                        className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base disabled:opacity-50"
                       >
                         Salvar
                       </button>
@@ -587,6 +719,61 @@ export default function MetasPage() {
                         <p className="mt-2 text-xs text-ink-faint">
                           Prazo: {formatarData(goal.deadline)}
                         </p>
+                      )}
+
+                      {goal.target_amount != null && (
+                        <div className="mt-3">
+                          <div className="mb-1 flex items-center justify-between text-xs text-ink-faint">
+                            <span>
+                              {formatarMoeda(goal.current_amount)} / {formatarMoeda(goal.target_amount)}
+                            </span>
+                            <span>
+                              {Math.min(
+                                100,
+                                Math.round((goal.current_amount / goal.target_amount) * 100)
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-base">
+                            <div
+                              className="h-full rounded-full bg-accent transition-all"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (goal.current_amount / goal.target_amount) * 100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <input
+                              value={valorGuardar[goal.id] || ""}
+                              onChange={(e) =>
+                                setValorGuardar((prev) => ({
+                                  ...prev,
+                                  [goal.id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  guardarDinheiro(goal);
+                                }
+                              }}
+                              placeholder="Quanto você guardou agora?"
+                              inputMode="decimal"
+                              className="flex-1 rounded-lg border border-base-border bg-base px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => guardarDinheiro(goal)}
+                              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-base transition-opacity hover:opacity-90"
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
                       )}
 
                       {(() => {
@@ -735,6 +922,24 @@ export default function MetasPage() {
                     <p className="line-clamp-2 text-sm font-semibold text-white">
                       {goal.title}
                     </p>
+                    {goal.target_amount != null && (
+                      <div className="mt-1.5">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
+                          <div
+                            className="h-full rounded-full bg-accent"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                (goal.current_amount / goal.target_amount) * 100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] text-white/80">
+                          {formatarMoeda(goal.current_amount)} / {formatarMoeda(goal.target_amount)}
+                        </p>
+                      </div>
+                    )}
                     {goal.status === "done" && (
                       <span className="mt-1 inline-block text-[10px] font-semibold text-white/80">
                         ✓ Concluída
