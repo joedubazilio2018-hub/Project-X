@@ -94,6 +94,8 @@ export default function FinancasPage() {
   const [mesPlanejamentoAberto, setMesPlanejamentoAberto] = useState<string | null>(null);
 
   const [salvando, setSalvando] = useState(false);
+  const [valorPoupanca, setValorPoupanca] = useState<Record<string, string>>({});
+  const [enviandoPoupancaId, setEnviandoPoupancaId] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -147,6 +149,67 @@ export default function FinancasPage() {
 
   function cancelarEdicao() {
     resetFormLancamento();
+  }
+
+  async function encontrarOuCriarCategoriaDaMeta(
+    goalId: string,
+    goalTitle: string,
+    userId: string
+  ): Promise<string> {
+    const existente = categories.find((c) => c.linked_goal_id === goalId);
+    if (existente) return existente.id;
+
+    const cor = CORES_CATEGORIA[categories.length % CORES_CATEGORIA.length];
+    const { data: novaCategoria } = await supabase
+      .from("categories")
+      .insert({
+        user_id: userId,
+        name: `Poupança · ${goalTitle}`,
+        color: cor,
+        linked_goal_id: goalId,
+      })
+      .select()
+      .single();
+
+    return novaCategoria!.id;
+  }
+
+  async function guardarNaPoupanca(goal: MetaVinculavel) {
+    const bruto = (valorPoupanca[goal.id] || "").replace(",", ".");
+    const valorNum = parseFloat(bruto);
+    if (!valorNum || valorNum <= 0) return;
+
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    setEnviandoPoupancaId(goal.id);
+
+    const categoriaId = await encontrarOuCriarCategoriaDaMeta(goal.id, goal.title, userId);
+
+    await supabase.from("transactions").insert({
+      user_id: userId,
+      type: "expense",
+      amount: valorNum,
+      category_id: categoriaId,
+      description: `Guardado para "${goal.title}"`,
+      date: hojeISO(),
+      paid: true,
+    });
+
+    const { data: metaAtual } = await supabase
+      .from("goals")
+      .select("current_amount")
+      .eq("id", goal.id)
+      .single();
+    const atual = Number(metaAtual?.current_amount ?? 0);
+    const novoValor = Number((atual + valorNum).toFixed(2));
+    await supabase.from("goals").update({ current_amount: novoValor }).eq("id", goal.id);
+
+    setValorPoupanca((prev) => ({ ...prev, [goal.id]: "" }));
+    setEnviandoPoupancaId(null);
+    setPaginaAtual(1);
+    carregar();
   }
 
   async function ajustarMetaVinculada(categoryId: string | null | undefined, delta: number) {
@@ -543,6 +606,69 @@ export default function FinancasPage() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Poupança */}
+          <section className="mb-6">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-ink">Poupança</h2>
+              <p className="mt-1 text-xs text-ink-muted">
+                Guarde dinheiro pras suas metas. Cada valor guardado vira uma despesa
+                normal aqui embaixo e soma no progresso da meta lá em Metas.
+              </p>
+            </div>
+
+            {metasVinculaveis.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Nenhuma meta com valor alvo ainda. Crie uma meta com "valor alvo" em
+                Metas pra poder guardar dinheiro pra ela aqui.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {metasVinculaveis.map((goal) => {
+                  const alvo = goal.target_amount ?? 0;
+                  const pct = alvo > 0 ? Math.min(100, (goal.current_amount / alvo) * 100) : 0;
+                  return (
+                    <li key={goal.id} className="rounded-xl border border-base-border bg-base-surface p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium text-ink">{goal.title}</span>
+                        <span className="text-xs text-ink-muted">
+                          {formatarMoeda(goal.current_amount)} / {formatarMoeda(alvo)}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-base">
+                        <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <input
+                          value={valorPoupanca[goal.id] || ""}
+                          onChange={(e) =>
+                            setValorPoupanca((prev) => ({ ...prev, [goal.id]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              guardarNaPoupanca(goal);
+                            }
+                          }}
+                          placeholder="Valor a guardar (ex: 50)"
+                          inputMode="decimal"
+                          className="flex-1 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => guardarNaPoupanca(goal)}
+                          disabled={enviandoPoupancaId === goal.id}
+                          className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
+                        >
+                          {enviandoPoupancaId === goal.id ? "Guardando..." : "Guardar"}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
           {/* Categorias */}
           <section className="mb-6">
