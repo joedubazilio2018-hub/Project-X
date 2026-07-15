@@ -46,6 +46,8 @@ export type Goal = {
   image_url: string | null;
   created_at: string;
   status_changed_at: string;
+  target_amount: number | null; // valor alvo, se for uma meta de guardar dinheiro
+  current_amount: number; // quanto já foi guardado
 };
 export type GoalItem = {
   id: string;
@@ -71,6 +73,7 @@ export type Category = {
   name: string;
   color: string;
   created_at: string;
+  linked_goal_id: string | null; // se preenchido, lançamentos nessa categoria alimentam a meta
 };
 export type TransactionType = "income" | "expense";
 export type Transaction = {
@@ -87,15 +90,6 @@ export type Transaction = {
   installment_number: number | null; // ex: 1, 2, 3...
   installment_total: number | null; // ex: 3 (total de parcelas)
   paid: boolean; // se a conta/lançamento já foi pago (ou recebido)
-};
-export type FinancialGoal = {
-  id: string;
-  user_id: string;
-  title: string;
-  target_amount: number;
-  current_amount: number;
-  deadline: string | null;
-  created_at: string;
 };
 export type Task = {
   id: string;
