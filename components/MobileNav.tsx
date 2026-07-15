@@ -19,7 +19,6 @@ const ITENS_MAIS_BASE = [
   { href: "/notas", label: "Notas", emoji: "🗒️" },
 ];
 
-
 const ITEM_ADMIN = { href: "/admin", label: "Admin", emoji: "🛠️" };
 
 export default function MobileNav({ souAdmin = false }: { souAdmin?: boolean }) {
@@ -61,7 +60,7 @@ export default function MobileNav({ souAdmin = false }: { souAdmin?: boolean }) 
           );
         })}
         <button
-          onClick={() => setMaisAberto(true)}
+          onClick={() => setMaisAberto((v) => !v)}
           className="flex flex-1 flex-col items-center justify-center gap-1 py-2.5"
           aria-label="Mais opções"
         >
@@ -72,57 +71,64 @@ export default function MobileNav({ souAdmin = false }: { souAdmin?: boolean }) 
         </button>
       </nav>
 
+      {/* Área invisível que fecha o menu ao tocar fora — sem escurecer a tela */}
       {maisAberto && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            aria-label="Fechar"
-            onClick={() => setMaisAberto(false)}
-            className="absolute inset-0 bg-black/60"
-          />
-          <div
-            className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-base-border bg-base-surface px-4 pb-6 pt-4 shadow-xl"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-base-border" />
-            <div className="grid grid-cols-3 gap-3">
-              {itensMais.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMaisAberto(false)}
-                  className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border text-center ${
-                    pathname === item.href
-                      ? "border-accent/40 bg-accent-dim text-accent"
-                      : "border-base-border bg-base text-ink-muted hover:bg-base-border/40"
-                  }`}
-                >
-                  <span className="text-2xl leading-none">{item.emoji}</span>
-                  <span className="text-xs font-medium">{item.label}</span>
-                </Link>
-              ))}
-              <Link
-                href="/perfil"
-                onClick={() => setMaisAberto(false)}
-                className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border text-center ${
-                  pathname === "/perfil"
-                    ? "border-accent/40 bg-accent-dim text-accent"
-                    : "border-base-border bg-base text-ink-muted hover:bg-base-border/40"
-                }`}
-              >
-                <span className="text-2xl leading-none">👤</span>
-                <span className="text-xs font-medium">Perfil</span>
-              </Link>
-            </div>
-            <button
-              onClick={sair}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-ink-faint hover:bg-base hover:text-warn"
-            >
-              <span>🚪</span>
-              Sair
-            </button>
-          </div>
-        </div>
+        <button
+          aria-label="Fechar"
+          onClick={() => setMaisAberto(false)}
+          className="fixed inset-0 z-30 bg-transparent md:hidden"
+        />
       )}
+
+      {/* Menu "Mais" — nasce do próprio botão, sem sheet de tela cheia */}
+      <div
+        className={`fixed right-3 z-40 w-52 origin-bottom-right rounded-2xl border border-base-border bg-base-surface p-2 shadow-2xl transition-all duration-200 ease-out md:hidden ${
+          maisAberto
+            ? "translate-y-0 scale-100 opacity-100"
+            : "pointer-events-none translate-y-2 scale-90 opacity-0"
+        }`}
+        style={{
+          bottom: "calc(64px + env(safe-area-inset-bottom) + 8px)",
+        }}
+      >
+        <div className="flex flex-col gap-0.5">
+          {itensMais.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMaisAberto(false)}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                pathname === item.href
+                  ? "bg-accent-dim text-accent"
+                  : "text-ink-muted hover:bg-base"
+              }`}
+            >
+              <span className="text-base leading-none">{item.emoji}</span>
+              {item.label}
+            </Link>
+          ))}
+          <Link
+            href="/perfil"
+            onClick={() => setMaisAberto(false)}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
+              pathname === "/perfil"
+                ? "bg-accent-dim text-accent"
+                : "text-ink-muted hover:bg-base"
+            }`}
+          >
+            <span className="text-base leading-none">👤</span>
+            Perfil
+          </Link>
+          <div className="my-1 border-t border-base-border" />
+          <button
+            onClick={sair}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-faint hover:bg-base hover:text-warn"
+          >
+            <span className="text-base leading-none">🚪</span>
+            Sair
+          </button>
+        </div>
+      </div>
     </>
   );
 }
