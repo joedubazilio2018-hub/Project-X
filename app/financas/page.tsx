@@ -20,8 +20,10 @@ import type {
   Category,
   Transaction,
   TransactionType,
-  FinancialGoal,
+  Goal,
 } from "@/types/database";
+
+type MetaVinculavel = Pick<Goal, "id" | "title" | "target_amount" | "current_amount">;
 
 const CORES_CATEGORIA = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
 const LANCAMENTOS_POR_PAGINA = 50;
@@ -67,7 +69,7 @@ export default function FinancasPage() {
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
+  const [metasVinculaveis, setMetasVinculaveis] = useState<MetaVinculavel[]>([]);
   const [loading, setLoading] = useState(true);
   const [paginaAtual, setPaginaAtual] = useState(1);
 
@@ -86,11 +88,8 @@ export default function FinancasPage() {
   const editandoId = editandoTransacao?.id ?? null;
 
   const [novaCategoria, setNovaCategoria] = useState("");
+  const [novaCategoriaMetaId, setNovaCategoriaMetaId] = useState("");
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
-
-  const [tituloMeta, setTituloMeta] = useState("");
-  const [valorMeta, setValorMeta] = useState("");
-  const [mostrarFormMeta, setMostrarFormMeta] = useState(false);
 
   const [mesPlanejamentoAberto, setMesPlanejamentoAberto] = useState<string | null>(null);
 
@@ -106,14 +105,15 @@ export default function FinancasPage() {
       .from("categories")
       .select("*")
       .order("created_at", { ascending: true });
-    const { data: fg } = await supabase
-      .from("financial_goals")
-      .select("*")
+    const { data: g } = await supabase
+      .from("goals")
+      .select("id, title, target_amount, current_amount")
+      .not("target_amount", "is", null)
       .order("created_at", { ascending: false });
 
     setTransactions((t as Transaction[]) ?? []);
     setCategories((c as Category[]) ?? []);
-    setFinancialGoals((fg as FinancialGoal[]) ?? []);
+    setMetasVinculaveis((g as MetaVinculavel[]) ?? []);
     setLoading(false);
   }, [supabase]);
 
@@ -149,6 +149,23 @@ export default function FinancasPage() {
     resetFormLancamento();
   }
 
+  async function ajustarMetaVinculada(categoryId: string | null | undefined, delta: number) {
+    if (!categoryId || !delta) return;
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat?.linked_goal_id) return;
+
+    const { data: metaAtual } = await supabase
+      .from("goals")
+      .select("current_amount")
+      .eq("id", cat.linked_goal_id)
+      .single();
+
+    const atual = Number(metaAtual?.current_amount ?? 0);
+    const novoValor = Number((atual + delta).toFixed(2));
+
+    await supabase.from("goals").update({ current_amount: novoValor }).eq("id", cat.linked_goal_id);
+  }
+
   async function salvarLancamento(e: React.FormEvent) {
     e.preventDefault();
     const valorNum = parseFloat(valor.replace(",", "."));
@@ -164,10 +181,18 @@ export default function FinancasPage() {
       };
 
       if (aplicarEmTodasParcelas && editandoTransacao.recurrence_group_id) {
+        const parcelasDoGrupo = transactions.filter(
+          (t) => t.recurrence_group_id === editandoTransacao.recurrence_group_id
+        );
+        const totalAntigo = parcelasDoGrupo.reduce((s, t) => s + t.amount, 0);
+
         await supabase
           .from("transactions")
           .update(camposComuns)
           .eq("recurrence_group_id", editandoTransacao.recurrence_group_id);
+
+        await ajustarMetaVinculada(editandoTransacao.category_id, -totalAntigo);
+        await ajustarMetaVinculada(categoriaId || null, valorNum * parcelasDoGrupo.length);
       } else if (!editandoTransacao.recurrence_group_id && repetir) {
         const qtdParcelas = Math.max(2, parseInt(totalParcelas, 10) || 2);
         const grupoId = crypto.randomUUID();
@@ -200,11 +225,17 @@ export default function FinancasPage() {
         if (novasParcelas.length > 0) {
           await supabase.from("transactions").insert(novasParcelas);
         }
+
+        await ajustarMetaVinculada(editandoTransacao.category_id, -editandoTransacao.amount);
+        await ajustarMetaVinculada(categoriaId || null, valorNum * qtdParcelas);
       } else {
         await supabase
           .from("transactions")
           .update({ ...camposComuns, date: data })
           .eq("id", editandoTransacao.id);
+
+        await ajustarMetaVinculada(editandoTransacao.category_id, -editandoTransacao.amount);
+        await ajustarMetaVinculada(categoriaId || null, valorNum);
       }
 
       resetFormLancamento();
@@ -236,6 +267,7 @@ export default function FinancasPage() {
     }));
 
     await supabase.from("transactions").insert(linhas);
+    await ajustarMetaVinculada(categoriaId || null, valorNum * qtdParcelas);
 
     resetFormLancamento();
     setPaginaAtual(1);
@@ -249,6 +281,11 @@ export default function FinancasPage() {
         "Esse lançamento faz parte de uma recorrência/parcelamento. Clique OK para apagar TODAS as parcelas, ou Cancelar para apagar apenas esta parcela."
       );
       if (apagarTodas) {
+        const parcelasDoGrupo = transactions.filter(
+          (tx) => tx.recurrence_group_id === t.recurrence_group_id
+        );
+        const totalGrupo = parcelasDoGrupo.reduce((s, tx) => s + tx.amount, 0);
+
         setTransactions((prev) =>
           prev.filter((tx) => tx.recurrence_group_id !== t.recurrence_group_id)
         );
@@ -256,11 +293,13 @@ export default function FinancasPage() {
           .from("transactions")
           .delete()
           .eq("recurrence_group_id", t.recurrence_group_id);
+        await ajustarMetaVinculada(t.category_id, -totalGrupo);
         return;
       }
     }
     setTransactions((prev) => prev.filter((tx) => tx.id !== t.id));
     await supabase.from("transactions").delete().eq("id", t.id);
+    await ajustarMetaVinculada(t.category_id, -t.amount);
   }
 
   async function alternarPago(t: Transaction) {
@@ -286,9 +325,11 @@ export default function FinancasPage() {
       user_id: userId,
       name: novaCategoria.trim(),
       color: cor,
+      linked_goal_id: novaCategoriaMetaId || null,
     });
 
     setNovaCategoria("");
+    setNovaCategoriaMetaId("");
     setMostrarFormCategoria(false);
     setSalvando(false);
     carregar();
@@ -299,33 +340,14 @@ export default function FinancasPage() {
     await supabase.from("categories").delete().eq("id", id);
   }
 
-  async function criarMetaFinanceira(e: React.FormEvent) {
-    e.preventDefault();
-    const valorNum = parseFloat(valorMeta.replace(",", "."));
-    if (!tituloMeta.trim() || !valorNum || valorNum <= 0) return;
-    setSalvando(true);
-
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) return;
-
-    await supabase.from("financial_goals").insert({
-      user_id: userId,
-      title: tituloMeta.trim(),
-      target_amount: valorNum,
-      current_amount: 0,
-    });
-
-    setTituloMeta("");
-    setValorMeta("");
-    setMostrarFormMeta(false);
-    setSalvando(false);
-    carregar();
-  }
-
-  async function excluirMetaFinanceira(id: string) {
-    setFinancialGoals((prev) => prev.filter((g) => g.id !== id));
-    await supabase.from("financial_goals").delete().eq("id", id);
+  async function vincularCategoriaAMeta(categoryId: string, goalId: string) {
+    setCategories((prev) =>
+      prev.map((c) => (c.id === categoryId ? { ...c, linked_goal_id: goalId || null } : c))
+    );
+    await supabase
+      .from("categories")
+      .update({ linked_goal_id: goalId || null })
+      .eq("id", categoryId);
   }
 
   // ── Cálculos derivados ──
@@ -522,48 +544,6 @@ export default function FinancasPage() {
             </div>
           </div>
 
-          {/* Metas financeiras */}
-          <section className="mb-6">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-ink">Metas financeiras</h2>
-              <button onClick={() => setMostrarFormMeta((v) => !v)} className="text-xs font-medium text-accent hover:underline">
-                {mostrarFormMeta ? "Cancelar" : "+ Nova meta"}
-              </button>
-            </div>
-
-            {mostrarFormMeta && (
-              <form onSubmit={criarMetaFinanceira} className="mb-3 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-4 sm:flex-row sm:flex-wrap sm:items-center">
-                <input value={tituloMeta} onChange={(e) => setTituloMeta(e.target.value)} placeholder="Ex: Guardar por mês" className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:min-w-[180px] sm:flex-1" required />
-                <input value={valorMeta} onChange={(e) => setValorMeta(e.target.value)} placeholder="Valor alvo (ex: 500)" inputMode="decimal" className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-40" required />
-                <button type="submit" disabled={salvando} className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto">Salvar</button>
-              </form>
-            )}
-
-            {financialGoals.length === 0 ? (
-              <p className="text-sm text-ink-muted">Nenhuma meta financeira ainda.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {financialGoals.map((goal) => {
-                  const pct = Math.min((goal.current_amount / goal.target_amount) * 100, 100);
-                  return (
-                    <li key={goal.id} className="group rounded-xl border border-base-border bg-base-surface p-4">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium text-ink">{goal.title}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-ink-muted">{formatarMoeda(goal.current_amount)} / {formatarMoeda(goal.target_amount)}</span>
-                          <button onClick={() => excluirMetaFinanceira(goal.id)} className="hidden text-xs text-ink-faint transition-colors hover:text-warn group-hover:block">Excluir</button>
-                        </div>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-base">
-                        <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
           {/* Categorias */}
           <section className="mb-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -574,20 +554,52 @@ export default function FinancasPage() {
             </div>
 
             {mostrarFormCategoria && (
-              <form onSubmit={criarCategoria} className="mb-3 flex items-center gap-3 rounded-xl border border-base-border bg-base-surface p-4">
-                <input value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Ex: Alimentação" className="flex-1 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" required />
-                <button type="submit" disabled={salvando} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50">Salvar</button>
+              <form onSubmit={criarCategoria} className="mb-3 flex flex-col gap-3 rounded-xl border border-base-border bg-base-surface p-4 sm:flex-row sm:flex-wrap sm:items-center">
+                <input value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Ex: Alimentação" className="w-full flex-1 rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:min-w-[160px]" required />
+                <select
+                  value={novaCategoriaMetaId}
+                  onChange={(e) => setNovaCategoriaMetaId(e.target.value)}
+                  className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-56"
+                >
+                  <option value="">Não vincular a nenhuma meta</option>
+                  {metasVinculaveis.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      Alimentar: {m.title}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" disabled={salvando} className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto">Salvar</button>
               </form>
             )}
 
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <span key={cat.id} className="group flex items-center gap-1.5 rounded-full border border-base-border px-3 py-1.5 text-xs text-ink">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
-                  {cat.name}
-                  <button onClick={() => excluirCategoria(cat.id)} className="hidden text-ink-faint hover:text-warn group-hover:inline">×</button>
-                </span>
-              ))}
+            <div className="flex flex-col gap-2">
+              {categories.map((cat) => {
+                const metaLigada = metasVinculaveis.find((m) => m.id === cat.linked_goal_id);
+                return (
+                  <div key={cat.id} className="group flex flex-wrap items-center gap-2 rounded-xl border border-base-border px-3 py-2">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                    <span className="text-xs text-ink">{cat.name}</span>
+                    <select
+                      value={cat.linked_goal_id ?? ""}
+                      onChange={(e) => vincularCategoriaAMeta(cat.id, e.target.value)}
+                      className="ml-auto rounded-lg border border-base-border bg-base px-2 py-1 text-[11px] text-ink-muted outline-none focus:border-accent"
+                    >
+                      <option value="">Sem vínculo com meta</option>
+                      {metasVinculaveis.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          Alimentar: {m.title}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={() => excluirCategoria(cat.id)} className="hidden text-ink-faint hover:text-warn group-hover:inline">×</button>
+                    {metaLigada && (
+                      <p className="basis-full text-[11px] text-ink-faint">
+                        Lançamentos aqui somam ao progresso de "{metaLigada.title}" ({formatarMoeda(metaLigada.current_amount)} / {formatarMoeda(metaLigada.target_amount ?? 0)})
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               {categories.length === 0 && <p className="text-sm text-ink-muted">Nenhuma categoria ainda.</p>}
             </div>
           </section>
