@@ -38,25 +38,34 @@ export default function LoginPage() {
         router.refresh();
       }
     } else {
-      // Valida o código de convite ANTES de criar a conta
+      // Código de convite agora é OPCIONAL. Se a pessoa preencheu, a
+      // gente confere antes de criar a conta (dá um erro amigável na
+      // hora, em vez de deixar o banco rejeitar depois). Se deixou em
+      // branco, segue direto pro cadastro normal — a conta nasce em
+      // trial de 7 dias (isso é decidido no banco, não aqui).
       const codigoLimpo = codigoConvite.trim();
 
-      const { data: codigoValido, error: erroValidacao } = await supabase.rpc(
-        "validar_codigo_convite",
-        { p_code: codigoLimpo }
-      );
+      if (codigoLimpo) {
+        const { data: codigoValido, error: erroValidacao } = await supabase.rpc(
+          "validar_codigo_convite",
+          { p_code: codigoLimpo }
+        );
 
-      if (erroValidacao || !codigoValido) {
-        setError("Código de convite inválido, expirado ou já utilizado.");
-        setLoading(false);
-        return;
+        if (erroValidacao || !codigoValido) {
+          setError("Código de convite inválido, expirado ou já utilizado.");
+          setLoading(false);
+          return;
+        }
       }
 
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { nome: nome.trim(), invite_code: codigoLimpo },
+          data: {
+            nome: nome.trim(),
+            ...(codigoLimpo ? { invite_code: codigoLimpo } : {}),
+          },
           emailRedirectTo:
             typeof window !== "undefined"
               ? `${window.location.origin}/login`
@@ -214,18 +223,23 @@ export default function LoginPage() {
             </div>
 
             {mode === "signup" && (
+              <div className="rounded-lg bg-accent-dim px-3 py-2 text-xs text-accent">
+                7 dias grátis pra testar tudo. Sem cartão de crédito agora.
+              </div>
+            )}
+
+            {mode === "signup" && (
               <div>
                 <label htmlFor="codigo" className="mb-1.5 block text-sm text-ink-muted">
-                  Código de convite
+                  Código de convite <span className="text-ink-faint">(opcional)</span>
                 </label>
                 <input
                   id="codigo"
                   type="text"
-                  required
                   value={codigoConvite}
                   onChange={(e) => setCodigoConvite(e.target.value)}
                   className="w-full rounded-lg border border-base-border bg-base px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-                  placeholder="Cole aqui o código recebido"
+                  placeholder="Só se alguém te enviou um"
                 />
               </div>
             )}
