@@ -224,7 +224,7 @@ export default function LoginPage() {
 
             {mode === "signup" && (
               <div className="rounded-lg bg-accent-dim px-3 py-2 text-xs text-accent">
-                7 dias grátis pra testar tudo. Sem cartão de crédito agora.
+                7 dias grátis pra testar tudo.
               </div>
             )}
 
