@@ -58,8 +58,13 @@ export default function Sidebar({ souAdmin = false }: { souAdmin?: boolean }) {
   return (
     <aside className="hidden h-screen w-56 flex-col border-r border-base-border bg-base-surface px-4 py-6 md:flex">
       <div className="mb-8 px-2">
-        <h1 className="font-display text-base font-bold text-ink">Ascese</h1>
-        <p className="mt-0.5 text-xs text-ink-faint">by JB Group</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo-mark.png"
+          alt="ASCEN"
+          className="h-9 w-9 rounded-full border border-base-border object-cover"
+        />
+        <p className="mt-1.5 text-xs text-ink-faint">by JB Group</p>
       </div>
       <NavLinks items={navItems} />
       <Link
