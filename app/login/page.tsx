@@ -1,18 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginConteudo />
+    </Suspense>
+  );
+}
+
+function LoginConteudo() {
   const router = useRouter();
   const supabase = createClient();
+  const searchParams = useSearchParams();
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [codigoConvite, setCodigoConvite] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(
+    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +46,7 @@ export default function LoginPage() {
         setError(traduzErro(error.message));
         setLoading(false);
       } else {
-        router.push("/");
+        router.push("/painel");
         router.refresh();
       }
     } else {
@@ -129,6 +141,10 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        <Link href="/" className="mb-6 inline-flex items-center gap-1 text-xs font-medium text-ink-faint transition-colors hover:text-ink">
+          ← Voltar para o início
+        </Link>
+
         <div className="mb-8 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -223,8 +239,14 @@ export default function LoginPage() {
             </div>
 
             {mode === "signup" && (
-              <div className="rounded-lg bg-accent-dim px-3 py-2 text-xs text-accent">
-                7 dias grátis pra testar tudo.
+              <div className="flex items-center gap-3 rounded-lg border border-accent/40 bg-accent-dim px-3 py-3">
+                <span className="text-xl">🎁</span>
+                <p className="text-sm text-accent">
+                  <span className="font-bold">7 dias grátis</span> pra testar tudo.
+                  <span className="block text-xs font-normal opacity-80">
+                    Sem cartão de crédito agora.
+                  </span>
+                </p>
               </div>
             )}
 
