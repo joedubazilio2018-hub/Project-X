@@ -150,7 +150,7 @@ function LoginConteudo() {
           <img
             src="/logo-mark.png"
             alt="ASCEN"
-            className="mx-auto mb-4 h-20 w-20 rounded-full border border-base-border object-cover"
+            className="mx-auto mb-4 h-20 w-20 object-contain"
           />
           <h1 className="font-display text-2xl font-bold text-ink">
             ASCEN
