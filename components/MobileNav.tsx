@@ -6,7 +6,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 
 const ABAS_PRINCIPAIS = [
-  { href: "/", label: "Painel", icon: IconePainel },
+  { href: "/painel", label: "Painel", icon: IconePainel },
   { href: "/habitos", label: "Hábitos", icon: IconeHabitos },
   { href: "/tarefas", label: "Tarefas", icon: IconeTarefas },
   { href: "/financas", label: "Finanças", icon: IconeFinancas },
