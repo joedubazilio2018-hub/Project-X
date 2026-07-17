@@ -248,10 +248,10 @@ export default function DashboardPage() {
 
   function corDoScore(score: number | null): string {
     if (score === null) return "#57575B";
-    if (score >= 80) return "#E5E5E3";
-    if (score >= 50) return "#3A3A3D";
-    if (score >= 20) return "#C7C7C5";
-    return "#B0B0AD";
+    if (score >= 80) return "#E8541E";
+    if (score >= 50) return "#D9A448";
+    if (score >= 20) return "#9C9CA0";
+    return "#57575B";
   }
 
   function explicacaoDoScore(): string {
@@ -294,9 +294,9 @@ export default function DashboardPage() {
   function corIntensidade(score: number | null): string {
     if (score === null) return "#161B26"; // sem nenhuma atividade registrada nesse dia
     if (score === 0) return "#2A2A2D";
-    if (score < 40) return "#134E48";
-    if (score < 80) return "#1E8F80";
-    return "#E5E5E3";
+    if (score < 40) return "#3A2216";
+    if (score < 80) return "#B84420";
+    return "#E8541E";
   }
 
   // Monta a linha do tempo unificada, juntando eventos de hábitos, metas, diário e finanças
@@ -312,7 +312,7 @@ export default function DashboardPage() {
           criadoEm: log.created_at,
           tipo: "habito",
           texto: `Hábito concluído: ${habito?.name ?? "hábito"}`,
-          cor: "#E5E5E3",
+          cor: "#E8541E",
         });
       });
 
@@ -323,7 +323,7 @@ export default function DashboardPage() {
           criadoEm: goal.created_at,
           tipo: "meta",
           texto: `Meta concluída: ${goal.title}`,
-          cor: "#C7C7C5",
+          cor: "#E8541E",
         });
       } else {
         eventos.push({
@@ -331,7 +331,7 @@ export default function DashboardPage() {
           criadoEm: goal.created_at,
           tipo: "meta",
           texto: `Meta criada: ${goal.title}`,
-          cor: "#C7C7C5",
+          cor: "#D9A448",
         });
       }
     });
@@ -342,7 +342,7 @@ export default function DashboardPage() {
         criadoEm: entry.created_at,
         tipo: "diario",
         texto: "Entrada no diário",
-        cor: "#71717A",
+        cor: "#3E7CB8",
       });
     });
 
@@ -359,7 +359,7 @@ export default function DashboardPage() {
           t.type === "income"
             ? `Receita registrada: ${valorFormatado}`
             : `Despesa registrada: ${valorFormatado}`,
-        cor: t.type === "income" ? "#E5E5E3" : "#B0B0AD",
+        cor: t.type === "income" ? "#2F9E6E" : "#D9455F",
       });
     });
 
@@ -836,7 +836,7 @@ export default function DashboardPage() {
                         style={{
                           height: `${info.score === null ? 0 : Math.max(info.score, 6)}%`,
                           backgroundColor:
-                            info.score !== null && info.score >= 80 ? "#E5E5E3" : "#57575B",
+                            info.score !== null && info.score >= 80 ? "#E8541E" : "#57575B",
                         }}
                         title={titulo}
                       />
@@ -863,9 +863,9 @@ export default function DashboardPage() {
               <div className="flex items-center gap-1.5 text-xs text-ink-faint">
                 <span>Menos</span>
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#2A2A2D" }} />
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#134E48" }} />
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#1E8F80" }} />
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#E5E5E3" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#3A2216" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#B84420" }} />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#E8541E" }} />
                 <span>Mais</span>
               </div>
             </div>
