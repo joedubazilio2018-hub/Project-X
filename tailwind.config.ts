@@ -19,15 +19,16 @@ const config: Config = {
           faint: "#57575B",
         },
         accent: {
-          DEFAULT: "#E5E5E3",
-          dim: "#242426",
+          DEFAULT: "#E8541E",
+          dim: "#3A2216",
         },
         warn: {
-          DEFAULT: "#B0B0AD",
-          dim: "#242422",
+          DEFAULT: "#D9455F",
+          dim: "#3A1620",
         },
         gold: {
-          DEFAULT: "#C7C7C5",
+          DEFAULT: "#D9A448",
+          dim: "#3A2F14",
         },
       },
       fontFamily: {
