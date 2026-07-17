@@ -17,7 +17,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Ascese",
+  title: "ASCEN",
   description: "Acompanhamento pessoal de hábitos, metas, diário e finanças.",
   manifest: "/manifest.json",
   icons: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Ascese",
+    title: "ASCEN",
   },
 };
 
