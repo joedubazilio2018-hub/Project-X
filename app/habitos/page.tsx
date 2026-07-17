@@ -6,8 +6,7 @@ import AppShell from "@/components/AppShell";
 import BotaoNotificacao from "@/components/BotaoNotificacao";
 import SwipeRow from "@/components/SwipeRow";
 import type { Habit, HabitLog, HabitCategory } from "@/types/database";
-
-const CORES = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
+import { CORES_CATEGORIA as CORES } from "@/lib/cores";
 
 function hojeISO(): string {
   const d = new Date();
