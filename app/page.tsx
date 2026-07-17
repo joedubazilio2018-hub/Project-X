@@ -9,10 +9,10 @@ const INTENSIDADE_GRADE: number[] = [
 
 const CORES_INTENSIDADE = [
   "#1C1C20", // 0 — nada ainda
-  "#2A2A2D", // 1
-  "#57575B", // 2
-  "#9C9CA0", // 3
-  "#C7C7C5", // 4 — constância plena (gold)
+  "#3A2216", // 1
+  "#7A3417", // 2
+  "#B84420", // 3
+  "#E8541E", // 4 — constância plena
 ];
 
 const MODULOS = [
