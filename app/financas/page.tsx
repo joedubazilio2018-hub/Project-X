@@ -22,10 +22,10 @@ import type {
   TransactionType,
   Goal,
 } from "@/types/database";
+import { CORES_CATEGORIA } from "@/lib/cores";
 
 type MetaVinculavel = Pick<Goal, "id" | "title" | "target_amount" | "current_amount">;
 
-const CORES_CATEGORIA = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
 const LANCAMENTOS_POR_PAGINA = 50;
 
 function hojeISO(): string {
@@ -601,7 +601,7 @@ export default function FinancasPage() {
                     formatter={(value: number) => formatarMoeda(value)}
                     contentStyle={{ backgroundColor: "#16161B", border: "1px solid #2A2A2D", borderRadius: 8, color: "#F0F0EE" }}
                   />
-                  <Line type="monotone" dataKey="saldo" stroke="#E5E5E3" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="saldo" stroke="#E8541E" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
