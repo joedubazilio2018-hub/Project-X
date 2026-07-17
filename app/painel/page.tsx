@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { createClient } from "@/lib/supabase-browser";
 import { frasedoDia } from "@/lib/frase-do-dia";
 import AppShell from "@/components/AppShell";
@@ -442,14 +443,22 @@ export default function DashboardPage() {
       gastosPorCategoriaMes.set(t.category_id as string, atual + t.amount);
     });
 
-  let categoriaTop: Category | null = null;
-  let categoriaTopValor = 0;
-  gastosPorCategoriaMes.forEach((valor, categoriaId) => {
-    if (valor > categoriaTopValor) {
-      categoriaTopValor = valor;
-      categoriaTop = categorias.find((c) => c.id === categoriaId) ?? null;
-    }
-  });
+  // Top 4 categorias do mês + "Outros", pra alimentar a mini rosca de gastos
+  const rankingCategoriasMes = Array.from(gastosPorCategoriaMes.entries())
+    .map(([categoriaId, valor]) => ({
+      nome: categorias.find((c) => c.id === categoriaId)?.name ?? "Sem categoria",
+      cor: categorias.find((c) => c.id === categoriaId)?.color ?? "#57575B",
+      valor,
+    }))
+    .sort((a, b) => b.valor - a.valor);
+
+  const dadosPizzaMes = rankingCategoriasMes.slice(0, 4);
+  const somaOutros = rankingCategoriasMes
+    .slice(4)
+    .reduce((acc, c) => acc + c.valor, 0);
+  if (somaOutros > 0) {
+    dadosPizzaMes.push({ nome: "Outros", cor: "#57575B", valor: somaOutros });
+  }
 
   // Lançamentos ainda não pagos/recebidos (inclui parcelas futuras)
   const pendentes = transacoesRecentes.filter((t) => !t.paid);
@@ -853,19 +862,41 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {categoriaTop && (
-                  <div className="mb-3 flex items-center gap-2 rounded-lg bg-base px-3 py-2 text-xs">
-                    <span
-                      className="h-2 w-2 flex-shrink-0 rounded-full"
-                      style={{ backgroundColor: (categoriaTop as Category).color }}
-                    />
-                    <span className="text-ink-muted">Pesou mais este mês:</span>
-                    <span className="font-medium text-ink">
-                      {(categoriaTop as Category).name}
-                    </span>
-                    <span className="ml-auto font-medium text-ink">
-                      {formatarMoeda(categoriaTopValor)}
-                    </span>
+                {dadosPizzaMes.length > 0 && (
+                  <div className="mb-3 flex items-center gap-3 rounded-lg bg-base px-3 py-2.5">
+                    <div className="h-16 w-16 flex-shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={dadosPizzaMes}
+                            dataKey="valor"
+                            nameKey="nome"
+                            innerRadius={18}
+                            outerRadius={30}
+                            paddingAngle={2}
+                            stroke="none"
+                          >
+                            {dadosPizzaMes.map((c, i) => (
+                              <Cell key={i} fill={c.cor} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      {dadosPizzaMes.map((c, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-xs">
+                          <span
+                            className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                            style={{ backgroundColor: c.cor }}
+                          />
+                          <span className="truncate text-ink-muted">{c.nome}</span>
+                          <span className="ml-auto flex-shrink-0 font-medium text-ink">
+                            {formatarMoeda(c.valor)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
