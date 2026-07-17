@@ -4,11 +4,11 @@ import type { Note } from "@/types/database";
 
 export const CORES_NOTA: Record<string, string> = {
   default: "#57575B",
-  teal: "#E5E5E3",
-  amber: "#C7C7C5",
-  coral: "#B0B0AD",
-  blue: "#8A8F98",
-  purple: "#71717A",
+  teal: "#E8541E",
+  amber: "#D9A448",
+  coral: "#D9455F",
+  blue: "#3E7CB8",
+  purple: "#8A6FD9",
 };
 
 function formatarDataCurta(iso: string): string {
