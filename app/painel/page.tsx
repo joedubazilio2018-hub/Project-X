@@ -13,6 +13,7 @@ import type {
   Goal,
   JournalEntry,
   Transaction,
+  Category,
   Mood,
   Task,
   Workout,
@@ -60,6 +61,7 @@ export default function DashboardPage() {
   const [goalsRecentes, setGoalsRecentes] = useState<Goal[]>([]);
   const [diarioRecente, setDiarioRecente] = useState<JournalEntry[]>([]);
   const [transacoesRecentes, setTransacoesRecentes] = useState<Transaction[]>([]);
+  const [categorias, setCategorias] = useState<Category[]>([]);
   const [tarefas, setTarefas] = useState<Task[]>([]);
   const [treinosAtivos, setTreinosAtivos] = useState<Workout[]>([]);
   const [sessoesTreino, setSessoesTreino] = useState<WorkoutSession[]>([]);
@@ -109,6 +111,10 @@ export default function DashboardPage() {
       .select("*")
       .order("created_at", { ascending: false });
 
+    const { data: categoriasData } = await supabase
+      .from("categories")
+      .select("*");
+
     const { data: tarefasData } = await supabase
       .from("tasks")
       .select("*")
@@ -155,6 +161,7 @@ export default function DashboardPage() {
     setGoalsRecentes((goalsData as Goal[]) ?? []);
     setDiarioRecente((diarioData as JournalEntry[]) ?? []);
     setTransacoesRecentes((transacoesData as Transaction[]) ?? []);
+    setCategorias((categoriasData as Category[]) ?? []);
     setTarefas((tarefasData as Task[]) ?? []);
     setTreinosAtivos((treinosData as Workout[]) ?? []);
     setSessoesTreino((sessoesData as WorkoutSession[]) ?? []);
@@ -420,6 +427,37 @@ export default function DashboardPage() {
   const mesAtual = hoje.slice(0, 7);
   const gastoMes = transacoesRecentes
     .filter((t) => t.type === "expense" && t.date.startsWith(mesAtual))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const receitaMes = transacoesRecentes
+    .filter((t) => t.type === "income" && t.date.startsWith(mesAtual))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  // Categoria que mais pesou nas despesas deste mês
+  const gastosPorCategoriaMes = new Map<string, number>();
+  transacoesRecentes
+    .filter((t) => t.type === "expense" && t.date.startsWith(mesAtual) && t.category_id)
+    .forEach((t) => {
+      const atual = gastosPorCategoriaMes.get(t.category_id as string) ?? 0;
+      gastosPorCategoriaMes.set(t.category_id as string, atual + t.amount);
+    });
+
+  let categoriaTop: Category | null = null;
+  let categoriaTopValor = 0;
+  gastosPorCategoriaMes.forEach((valor, categoriaId) => {
+    if (valor > categoriaTopValor) {
+      categoriaTopValor = valor;
+      categoriaTop = categorias.find((c) => c.id === categoriaId) ?? null;
+    }
+  });
+
+  // Lançamentos ainda não pagos/recebidos (inclui parcelas futuras)
+  const pendentes = transacoesRecentes.filter((t) => !t.paid);
+  const totalAPagar = pendentes
+    .filter((t) => t.type === "expense")
+    .reduce((acc, t) => acc + t.amount, 0);
+  const totalAReceber = pendentes
+    .filter((t) => t.type === "income")
     .reduce((acc, t) => acc + t.amount, 0);
 
   function formatarDataRelativa(iso: string): string {
@@ -789,24 +827,63 @@ export default function DashboardPage() {
                 Você ainda não tem lançamentos cadastrados.
               </p>
             ) : (
-              <div className="flex items-center gap-6">
-                <div>
-                  <p
-                    className={`font-display text-xl font-bold ${
-                      saldoTotal >= 0 ? "text-accent" : "text-warn"
-                    }`}
-                  >
-                    {formatarMoeda(saldoTotal)}
-                  </p>
-                  <p className="text-xs text-ink-muted">Saldo total</p>
+              <>
+                <div className="mb-4 grid grid-cols-3 gap-3">
+                  <div>
+                    <p
+                      className={`font-display text-lg font-bold ${
+                        saldoTotal >= 0 ? "text-accent" : "text-warn"
+                      }`}
+                    >
+                      {formatarMoeda(saldoTotal)}
+                    </p>
+                    <p className="text-xs text-ink-muted">Saldo total</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg font-bold text-ink">
+                      {formatarMoeda(receitaMes)}
+                    </p>
+                    <p className="text-xs text-ink-muted">Receita (mês)</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg font-bold text-warn">
+                      {formatarMoeda(gastoMes)}
+                    </p>
+                    <p className="text-xs text-ink-muted">Gasto (mês)</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-display text-xl font-bold text-warn">
-                    {formatarMoeda(gastoMes)}
-                  </p>
-                  <p className="text-xs text-ink-muted">Gasto este mês</p>
-                </div>
-              </div>
+
+                {categoriaTop && (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg bg-base px-3 py-2 text-xs">
+                    <span
+                      className="h-2 w-2 flex-shrink-0 rounded-full"
+                      style={{ backgroundColor: (categoriaTop as Category).color }}
+                    />
+                    <span className="text-ink-muted">Pesou mais este mês:</span>
+                    <span className="font-medium text-ink">
+                      {(categoriaTop as Category).name}
+                    </span>
+                    <span className="ml-auto font-medium text-ink">
+                      {formatarMoeda(categoriaTopValor)}
+                    </span>
+                  </div>
+                )}
+
+                {(totalAPagar > 0 || totalAReceber > 0) && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {totalAPagar > 0 && (
+                      <span className="rounded-full bg-warn-dim px-2.5 py-1 text-xs font-medium text-warn">
+                        {formatarMoeda(totalAPagar)} a pagar
+                      </span>
+                    )}
+                    {totalAReceber > 0 && (
+                      <span className="rounded-full bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent">
+                        {formatarMoeda(totalAReceber)} a receber
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </section>
 
