@@ -31,13 +31,14 @@ export default function LandingPage() {
     <main className="min-h-screen bg-base text-ink">
       {/* Header */}
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-mark.png"
             alt="ASCEN"
-            className="h-8 w-8 rounded-full border border-base-border object-cover"
+            className="h-12 w-12 object-contain"
           />
+          <span className="font-display text-xl font-bold tracking-tight">ASCEN</span>
         </div>
         <Link
           href="/login"
