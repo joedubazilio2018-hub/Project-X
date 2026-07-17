@@ -149,11 +149,11 @@ function LoginConteudo() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-mark.png"
-            alt="Ascese"
+            alt="ASCEN"
             className="mx-auto mb-4 h-20 w-20 rounded-full border border-base-border object-cover"
           />
           <h1 className="font-display text-2xl font-bold text-ink">
-            Ascese
+            ASCEN
           </h1>
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-faint">
             by JB Group
