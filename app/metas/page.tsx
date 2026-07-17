@@ -5,8 +5,7 @@ import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
 import type { Goal, GoalStatus, GoalCategory, GoalItem } from "@/types/database";
-
-const CORES = ["#E5E5E3", "#C7C7C5", "#B0B0AD", "#8A8F98", "#71717A", "#3A3A3D"];
+import { CORES_CATEGORIA as CORES } from "@/lib/cores";
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -20,8 +19,8 @@ const STATUS_LABEL: Record<GoalStatus, string> = {
 
 const STATUS_COLOR: Record<GoalStatus, string> = {
   not_started: "#57575B",
-  in_progress: "#C7C7C5",
-  done: "#E5E5E3",
+  in_progress: "#D9A448",
+  done: "#E8541E",
 };
 
 const STATUS_ORDER: GoalStatus[] = ["in_progress", "not_started", "done"];
