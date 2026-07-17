@@ -35,10 +35,9 @@ export default function LandingPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-mark.png"
-            alt="Ascese"
+            alt="ASCEN"
             className="h-8 w-8 rounded-full border border-base-border object-cover"
           />
-          <span className="font-display text-lg font-bold">Ascese</span>
         </div>
         <Link
           href="/login"
@@ -134,7 +133,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-base-border px-6 py-8 text-center text-xs text-ink-faint">
-        Ascese — by JB Group
+        ASCEN — by JB Group
       </footer>
     </main>
   );
