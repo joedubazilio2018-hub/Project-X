@@ -50,6 +50,8 @@ function TreinosConteudo() {
   const [nomeRotina, setNomeRotina] = useState("");
   const [exerciciosForm, setExerciciosForm] = useState<ExercicioForm[]>([novoExercicioVazio()]);
   const [salvando, setSalvando] = useState(false);
+  const [catalogoExercicios, setCatalogoExercicios] = useState<string[]>([]);
+  const [linhaComSugestoes, setLinhaComSugestoes] = useState<string | null>(null);
 
   const [sessaoAtiva, setSessaoAtiva] = useState<{
     workout: Workout;
@@ -84,6 +86,13 @@ function TreinosConteudo() {
       .not("finished_at", "is", null)
       .order("finished_at", { ascending: false })
       .limit(10);
+
+    const { data: catalogoData } = await supabase
+      .from("exercise_catalog")
+      .select("name")
+      .order("name", { ascending: true });
+
+    setCatalogoExercicios(((catalogoData as { name: string }[] | null) ?? []).map((c) => c.name));
 
     const mapa: Record<string, WorkoutExercise[]> = {};
     (exerciciosData as WorkoutExercise[] | null)?.forEach((ex) => {
@@ -122,6 +131,29 @@ function TreinosConteudo() {
         : [novoExercicioVazio()]
     );
     setFormAberto(workout.id);
+  }
+
+  function sugestoesPara(texto: string): string[] {
+    const alvo = texto.trim().toLowerCase();
+    if (!alvo) return [];
+    return catalogoExercicios
+      .filter((nome) => nome.toLowerCase().includes(alvo))
+      .slice(0, 6);
+  }
+
+  async function sincronizarCatalogo(nomes: string[]) {
+    const novos = Array.from(new Set(nomes.map((n) => n.trim()))).filter(
+      (nome) => nome && !catalogoExercicios.some((c) => c.toLowerCase() === nome.toLowerCase())
+    );
+    for (const nome of novos) {
+      const { error } = await supabase.from("exercise_catalog").insert({ name: nome });
+      if (!error) {
+        setCatalogoExercicios((atual) => [...atual, nome]);
+      }
+      // Se der erro (ex: outro usuário cadastrou o mesmo nome nesse
+      // meio tempo), ignora — o exercício já existe no catálogo de
+      // qualquer forma, é só a nossa lista local que ficou desatualizada.
+    }
   }
 
   function atualizarExercicioForm(tempId: string, campo: keyof ExercicioForm, valor: string) {
@@ -190,6 +222,7 @@ function TreinosConteudo() {
 
     setFormAberto(null);
     setSalvando(false);
+    sincronizarCatalogo(exerciciosValidos.map((ex) => ex.name.trim()));
     carregar();
   }
 
@@ -369,12 +402,47 @@ function TreinosConteudo() {
               <div className="flex flex-col gap-2">
                 {exerciciosForm.map((ex) => (
                   <div key={ex.tempId} className="flex flex-wrap items-center gap-2 rounded-lg border border-base-border p-2">
-                    <input
-                      value={ex.name}
-                      onChange={(e) => atualizarExercicioForm(ex.tempId, "name", e.target.value)}
-                      placeholder="Exercício"
-                      className="min-w-[140px] flex-1 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
-                    />
+                    <div className="relative min-w-[140px] flex-1">
+                      <input
+                        value={ex.name}
+                        onChange={(e) => {
+                          atualizarExercicioForm(ex.tempId, "name", e.target.value);
+                          setLinhaComSugestoes(ex.tempId);
+                        }}
+                        onFocus={() => setLinhaComSugestoes(ex.tempId)}
+                        onBlur={() =>
+                          setTimeout(
+                            () =>
+                              setLinhaComSugestoes((atual) =>
+                                atual === ex.tempId ? null : atual
+                              ),
+                            150
+                          )
+                        }
+                        placeholder="Exercício"
+                        autoComplete="off"
+                        className="w-full rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
+                      />
+                      {linhaComSugestoes === ex.tempId &&
+                        sugestoesPara(ex.name).length > 0 && (
+                          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-base-border bg-base-surface shadow-lg">
+                            {sugestoesPara(ex.name).map((nome) => (
+                              <button
+                                key={nome}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  atualizarExercicioForm(ex.tempId, "name", nome);
+                                  setLinhaComSugestoes(null);
+                                }}
+                                className="block w-full truncate px-3 py-1.5 text-left text-sm text-ink hover:bg-base"
+                              >
+                                {nome}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                    </div>
                     <input
                       value={ex.sets}
                       onChange={(e) => atualizarExercicioForm(ex.tempId, "sets", e.target.value)}
