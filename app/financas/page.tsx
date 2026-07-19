@@ -160,7 +160,7 @@ export default function FinancasPage() {
     if (existente) return existente.id;
 
     const cor = CORES_CATEGORIA[categories.length % CORES_CATEGORIA.length];
-    const { data: novaCategoria } = await supabase
+    const { data: novaCategoria, error } = await supabase
       .from("categories")
       .insert({
         user_id: userId,
@@ -171,7 +171,11 @@ export default function FinancasPage() {
       .select()
       .single();
 
-    return novaCategoria!.id;
+    if (error || !novaCategoria) {
+      throw new Error("Não foi possível criar a categoria de poupança para essa meta.");
+    }
+
+    return novaCategoria.id;
   }
 
   async function guardarNaPoupanca(goal: MetaVinculavel) {
@@ -185,31 +189,37 @@ export default function FinancasPage() {
 
     setEnviandoPoupancaId(goal.id);
 
-    const categoriaId = await encontrarOuCriarCategoriaDaMeta(goal.id, goal.title, userId);
+    try {
+      const categoriaId = await encontrarOuCriarCategoriaDaMeta(goal.id, goal.title, userId);
 
-    await supabase.from("transactions").insert({
-      user_id: userId,
-      type: "expense",
-      amount: valorNum,
-      category_id: categoriaId,
-      description: `Guardado para "${goal.title}"`,
-      date: hojeISO(),
-      paid: true,
-    });
+      await supabase.from("transactions").insert({
+        user_id: userId,
+        type: "expense",
+        amount: valorNum,
+        category_id: categoriaId,
+        description: `Guardado para "${goal.title}"`,
+        date: hojeISO(),
+        paid: true,
+      });
 
-    const { data: metaAtual } = await supabase
-      .from("goals")
-      .select("current_amount")
-      .eq("id", goal.id)
-      .single();
-    const atual = Number(metaAtual?.current_amount ?? 0);
-    const novoValor = Number((atual + valorNum).toFixed(2));
-    await supabase.from("goals").update({ current_amount: novoValor }).eq("id", goal.id);
+      const { data: metaAtual } = await supabase
+        .from("goals")
+        .select("current_amount")
+        .eq("id", goal.id)
+        .single();
+      const atual = Number(metaAtual?.current_amount ?? 0);
+      const novoValor = Number((atual + valorNum).toFixed(2));
+      await supabase.from("goals").update({ current_amount: novoValor }).eq("id", goal.id);
 
-    setValorPoupanca((prev) => ({ ...prev, [goal.id]: "" }));
-    setEnviandoPoupancaId(null);
-    setPaginaAtual(1);
-    carregar();
+      setValorPoupanca((prev) => ({ ...prev, [goal.id]: "" }));
+      setPaginaAtual(1);
+      carregar();
+    } catch (err) {
+      console.error("Erro ao guardar na poupança:", err);
+      alert("Não deu pra guardar esse valor agora. Tenta de novo em instantes.");
+    } finally {
+      setEnviandoPoupancaId(null);
+    }
   }
 
   async function ajustarMetaVinculada(categoryId: string | null | undefined, delta: number) {
