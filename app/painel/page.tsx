@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { frasedoDia } from "@/lib/frase-do-dia";
 import AppShell from "@/components/AppShell";
 import CompartilharFrase from "@/components/CompartilharFrase";
+import { useToast } from "@/components/ToastProvider";
 import { calcularTDEE, calcularKcal } from "@/lib/nutricao";
 import type {
   Habit,
@@ -54,9 +55,11 @@ function ultimosNDias(n: number): string[] {
 
 const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 const DIAS_CALENDARIO = 90;
+const MSG_ERRO_CARREGAR = "Alguns dados podem não ter carregado corretamente. Puxe pra atualizar ou volte mais tarde.";
 
 export default function DashboardPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs90dias, setLogs90dias] = useState<HabitLog[]>([]);
   const [goalsRecentes, setGoalsRecentes] = useState<Goal[]>([]);
@@ -82,79 +85,96 @@ export default function DashboardPage() {
     }
 
     const dias = ultimosNDias(DIAS_CALENDARIO);
+    let houveErro = false;
 
-    const { data: habitsData } = await supabase
+    const { data: habitsData, error: erroHabits } = await supabase
       .from("habits")
       .select("*")
       .eq("archived", false)
       .order("created_at", { ascending: true });
+    if (erroHabits) houveErro = true;
 
-    const { data: logsData } = await supabase
+    const { data: logsData, error: erroLogs } = await supabase
       .from("habit_logs")
       .select("*")
       .gte("date", dias[0])
       .lte("date", dias[dias.length - 1]);
+    if (erroLogs) houveErro = true;
 
-    const { data: goalsData } = await supabase
+    const { data: goalsData, error: erroGoals } = await supabase
       .from("goals")
       .select("*")
       .order("created_at", { ascending: false });
+    if (erroGoals) houveErro = true;
 
     const dias30 = ultimosNDias(30);
-    const { data: diarioData } = await supabase
+    const { data: diarioData, error: erroDiario } = await supabase
       .from("journal_entries")
       .select("*")
       .gte("entry_date", dias30[0])
       .order("created_at", { ascending: false });
+    if (erroDiario) houveErro = true;
 
-    const { data: transacoesData } = await supabase
+    const { data: transacoesData, error: erroTransacoes } = await supabase
       .from("transactions")
       .select("*")
       .order("created_at", { ascending: false });
+    if (erroTransacoes) houveErro = true;
 
-    const { data: categoriasData } = await supabase
+    const { data: categoriasData, error: erroCategorias } = await supabase
       .from("categories")
       .select("*");
+    if (erroCategorias) houveErro = true;
 
-    const { data: tarefasData } = await supabase
+    const { data: tarefasData, error: erroTarefas } = await supabase
       .from("tasks")
       .select("*")
       .order("due_date", { ascending: true, nullsFirst: false });
+    if (erroTarefas) houveErro = true;
 
-    const { data: treinosData } = await supabase
+    const { data: treinosData, error: erroTreinos } = await supabase
       .from("workouts")
       .select("*")
       .eq("archived", false);
+    if (erroTreinos) houveErro = true;
 
-    const { data: sessoesData } = await supabase
+    const { data: sessoesData, error: erroSessoes } = await supabase
       .from("workout_sessions")
       .select("*")
       .not("finished_at", "is", null)
       .order("finished_at", { ascending: false })
       .limit(10);
+    if (erroSessoes) houveErro = true;
 
     const hojeCarregar = hojeISO();
     const userId = userData.user?.id;
 
-    const { data: metricsData } = await supabase
+    const { data: metricsData, error: erroMetrics } = await supabase
       .from("body_metrics")
       .select("*")
       .eq("user_id", userId ?? "")
       .maybeSingle();
+    if (erroMetrics) houveErro = true;
 
-    const { data: refeicoesHojeData } = await supabase
+    const { data: refeicoesHojeData, error: erroRefeicoes } = await supabase
       .from("meals")
       .select("*")
       .eq("date", hojeCarregar);
+    if (erroRefeicoes) houveErro = true;
 
     const idsRefeicoesHoje = (refeicoesHojeData ?? []).map((m) => m.id as string);
     let itensDietaData: MealItem[] = [];
     if (idsRefeicoesHoje.length > 0) {
-      const { data } = await supabase
+      const { data, error: erroItensDieta } = await supabase
         .from("meal_items")
         .select("*")
         .in("meal_id", idsRefeicoesHoje);
+      if (erroItensDieta) houveErro = true;
       itensDietaData = (data as MealItem[]) ?? [];
+    }
+
+    if (houveErro) {
+      mostrarToast(MSG_ERRO_CARREGAR);
     }
 
     setHabits((habitsData as Habit[]) ?? []);
