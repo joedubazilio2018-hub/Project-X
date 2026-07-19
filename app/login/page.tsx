@@ -147,7 +147,7 @@ function LoginConteudo() {
         </Link>
 
         <div className="mb-8 text-center">
-                    <Image
+          <Image
             src="/logo-mark.png"
             alt="ASCEN"
             width={220}
@@ -276,7 +276,7 @@ function LoginConteudo() {
           </form>
         </div>
 
-                <div className="mt-10 text-center">
+        <div className="mt-10 text-center">
           <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-ink-faint">
             desenvolvido por
           </p>
