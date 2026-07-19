@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
 import type { Task } from "@/types/database";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 type Visao = "hoje" | "semana";
 
@@ -34,6 +37,7 @@ function formatarData(iso: string): string {
 
 export default function TarefasPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [visao, setVisao] = useState<Visao>("hoje");
@@ -79,11 +83,17 @@ export default function TarefasPage() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    await supabase.from("tasks").insert({
+    const { error } = await supabase.from("tasks").insert({
       user_id: userId,
       title: novoTitulo.trim(),
       due_date: novoPrazo || null,
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     setNovoTitulo("");
     setNovoPrazo("");
@@ -100,28 +110,42 @@ export default function TarefasPage() {
 
   async function salvarEdicao(taskId: string) {
     if (!editTitulo.trim()) return;
-    await supabase
+    const { error } = await supabase
       .from("tasks")
       .update({ title: editTitulo.trim(), due_date: editPrazo || null })
       .eq("id", taskId);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     setEditandoId(null);
     carregar();
   }
 
   async function excluirTarefa(taskId: string) {
-    await supabase.from("tasks").delete().eq("id", taskId);
+    const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
   async function alternarConcluida(task: Task) {
     const novoDone = !task.done;
-    await supabase
+    const { error } = await supabase
       .from("tasks")
       .update({
         done: novoDone,
         completed_at: novoDone ? new Date().toISOString() : null,
       })
       .eq("id", task.id);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
