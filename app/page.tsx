@@ -31,14 +31,15 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-base text-ink">
       {/* Header */}
+            {/* Header */}
       <header className="relative mx-auto flex max-w-5xl items-center justify-center px-6 py-6">
         <Image
           src="/logo-mark.png"
           alt="ASCEN"
-          width={96}
-          height={96}
+          width={160}
+          height={160}
           priority
-          className="h-14 w-14 object-contain"
+          className="h-24 w-24 object-contain"
         />
         <Link
           href="/login"
@@ -130,16 +131,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-base-border px-6 py-10 text-center">
+            <footer className="border-t border-base-border px-6 py-10 text-center">
         <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-ink-faint">
           desenvolvido por
         </p>
         <Image
           src="/jb-group-logo.png"
           alt="JB Group"
-          width={210}
-          height={140}
-          className="mx-auto h-10 w-auto object-contain"
+          width={320}
+          height={213}
+          className="mx-auto h-20 w-auto object-contain"
         />
       </footer>
     </main>
