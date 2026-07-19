@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import DietaView from "@/components/DietaView";
 import type { Workout, WorkoutExercise, WorkoutSession } from "@/types/database";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 type ExercicioForm = {
   tempId: string;
@@ -38,6 +41,7 @@ export default function TreinosPage() {
 
 function TreinosConteudo() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const searchParams = useSearchParams();
   const abaInicial = searchParams.get("aba") === "dieta" ? "dieta" : "treinos";
   const [aba, setAba] = useState<"treinos" | "dieta">(abaInicial);
@@ -184,14 +188,20 @@ function TreinosConteudo() {
     if (!userId) return;
 
     if (formAberto === "novo") {
-      const { data: novaRotina } = await supabase
+      const { data: novaRotina, error: erroRotina } = await supabase
         .from("workouts")
         .insert({ user_id: userId, name: nomeRotina.trim(), position: workouts.length })
         .select()
         .single();
 
+      if (erroRotina) {
+        mostrarToast(MSG_ERRO_PADRAO);
+        setSalvando(false);
+        return;
+      }
+
       if (novaRotina) {
-        await supabase.from("workout_exercises").insert(
+        const { error: erroExercicios } = await supabase.from("workout_exercises").insert(
           exerciciosValidos.map((ex, i) => ({
             workout_id: novaRotina.id,
             user_id: userId,
@@ -202,12 +212,23 @@ function TreinosConteudo() {
             position: i,
           }))
         );
+        if (erroExercicios) {
+          mostrarToast(MSG_ERRO_PADRAO);
+          setSalvando(false);
+          return;
+        }
       }
     } else if (formAberto) {
       const workoutId = formAberto;
-      await supabase.from("workouts").update({ name: nomeRotina.trim() }).eq("id", workoutId);
-      await supabase.from("workout_exercises").delete().eq("workout_id", workoutId);
-      await supabase.from("workout_exercises").insert(
+      const { error: erroNome } = await supabase
+        .from("workouts")
+        .update({ name: nomeRotina.trim() })
+        .eq("id", workoutId);
+      const { error: erroExclusao } = await supabase
+        .from("workout_exercises")
+        .delete()
+        .eq("workout_id", workoutId);
+      const { error: erroInsercao } = await supabase.from("workout_exercises").insert(
         exerciciosValidos.map((ex, i) => ({
           workout_id: workoutId,
           user_id: userId,
@@ -218,6 +239,13 @@ function TreinosConteudo() {
           position: i,
         }))
       );
+
+      if (erroNome || erroExclusao || erroInsercao) {
+        mostrarToast(MSG_ERRO_PADRAO);
+        setSalvando(false);
+        carregar(); // recarrega pra refletir o que de fato ficou salvo
+        return;
+      }
     }
 
     setFormAberto(null);
@@ -227,7 +255,14 @@ function TreinosConteudo() {
   }
 
   async function arquivarRotina(workoutId: string) {
-    await supabase.from("workouts").update({ archived: true }).eq("id", workoutId);
+    const { error } = await supabase
+      .from("workouts")
+      .update({ archived: true })
+      .eq("id", workoutId);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
@@ -257,13 +292,18 @@ function TreinosConteudo() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    await supabase.from("workout_sessions").insert({
+    const { error } = await supabase.from("workout_sessions").insert({
       user_id: userId,
       workout_id: sessaoAtiva.workout.id,
       workout_name: sessaoAtiva.workout.name,
       started_at: sessaoAtiva.iniciadoEm,
       finished_at: new Date().toISOString(),
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     setSessaoAtiva(null);
     carregar();
