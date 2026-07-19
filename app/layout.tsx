@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
+import ToastProvider from "@/components/ToastProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -48,7 +49,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${inter.variable} ${fraunces.variable}`}>
       <body className="font-sans antialiased">
         <RegistrarServiceWorker />
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
