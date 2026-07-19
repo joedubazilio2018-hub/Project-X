@@ -7,6 +7,9 @@ import BotaoNotificacao from "@/components/BotaoNotificacao";
 import SwipeRow from "@/components/SwipeRow";
 import type { Habit, HabitLog, HabitCategory } from "@/types/database";
 import { CORES_CATEGORIA as CORES } from "@/lib/cores";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 function hojeISO(): string {
   const d = new Date();
@@ -18,6 +21,7 @@ function hojeISO(): string {
 
 export default function HabitosPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [categories, setCategories] = useState<HabitCategory[]>([]);
   const [logsHoje, setLogsHoje] = useState<Record<string, boolean>>({});
@@ -92,13 +96,19 @@ export default function HabitosPage() {
 
     const cat = categories.find((c) => c.id === novaCategoriaId);
 
-    await supabase.from("habits").insert({
+    const { error } = await supabase.from("habits").insert({
       user_id: userId,
       name: novoNome.trim(),
       category_id: novaCategoriaId || null,
       color: cat?.color ?? CORES[0],
       frequency: "daily",
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     setNovoNome("");
     setNovaCategoriaId("");
@@ -117,7 +127,7 @@ export default function HabitosPage() {
     if (!editNome.trim()) return;
     const cat = categories.find((c) => c.id === editCategoriaId);
 
-    await supabase
+    const { error } = await supabase
       .from("habits")
       .update({
         name: editNome.trim(),
@@ -125,6 +135,11 @@ export default function HabitosPage() {
         color: cat?.color ?? CORES[0],
       })
       .eq("id", habitId);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     setEditandoId(null);
     carregar();
@@ -135,10 +150,11 @@ export default function HabitosPage() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    const feitoAgora = !logsHoje[habitId];
+    const feitoAnterior = !!logsHoje[habitId];
+    const feitoAgora = !feitoAnterior;
     setLogsHoje((prev) => ({ ...prev, [habitId]: feitoAgora }));
 
-    await supabase
+    const { error } = await supabase
       .from("habit_logs")
       .upsert(
         {
@@ -149,10 +165,23 @@ export default function HabitosPage() {
         },
         { onConflict: "habit_id,date" }
       );
+
+    if (error) {
+      setLogsHoje((prev) => ({ ...prev, [habitId]: feitoAnterior }));
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function arquivarHabito(habitId: string) {
-    await supabase.from("habits").update({ archived: true }).eq("id", habitId);
+    const { error } = await supabase
+      .from("habits")
+      .update({ archived: true })
+      .eq("id", habitId);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
@@ -168,11 +197,17 @@ export default function HabitosPage() {
 
     const cor = CORES[categories.length % CORES.length];
 
-    await supabase.from("habit_categories").insert({
+    const { error } = await supabase.from("habit_categories").insert({
       user_id: userId,
       name: novaCategoriaNome.trim(),
       color: cor,
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     setNovaCategoriaNome("");
     setMostrarFormCategoria(false);
@@ -187,16 +222,25 @@ export default function HabitosPage() {
 
   async function salvarEdicaoCategoria(categoriaId: string) {
     if (!editCategoriaNome.trim()) return;
-    await supabase
+    const { error } = await supabase
       .from("habit_categories")
       .update({ name: editCategoriaNome.trim() })
       .eq("id", categoriaId);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     setEditandoCategoriaId(null);
     carregar();
   }
 
   async function excluirCategoria(categoriaId: string) {
-    await supabase.from("habit_categories").delete().eq("id", categoriaId);
+    const { error } = await supabase.from("habit_categories").delete().eq("id", categoriaId);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
