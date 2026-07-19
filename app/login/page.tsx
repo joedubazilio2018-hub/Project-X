@@ -155,12 +155,6 @@ function LoginConteudo() {
             priority
             className="mx-auto mb-4 h-20 w-20 object-contain"
           />
-          <h1 className="font-display text-2xl font-bold text-ink">
-            ASCEN
-          </h1>
-          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-faint">
-            by JB Group
-          </p>
           <p className="mt-3 text-sm text-ink-muted">
             Hábitos, metas e rotina. Sem desculpas.
           </p>
@@ -280,6 +274,19 @@ function LoginConteudo() {
               {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
             </button>
           </form>
+        </div>
+
+        <div className="mt-10 text-center">
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-ink-faint">
+            desenvolvido por
+          </p>
+          <Image
+            src="/jb-group-logo.png"
+            alt="JB Group"
+            width={210}
+            height={140}
+            className="mx-auto h-10 w-auto object-contain"
+          />
         </div>
       </div>
     </main>
