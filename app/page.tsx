@@ -79,7 +79,7 @@ export default function LandingPage() {
           </Link>
         </div>
         <p className="mt-3 text-xs text-ink-faint">
-          Sem cartão de crédito pra começar.
+          Leva menos de um minuto pra começar.
         </p>
 
         {/* Signature: a grade de constância que existe de verdade no app,
@@ -122,7 +122,7 @@ export default function LandingPage() {
             O placar de hoje ainda está em branco.
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-sm text-ink-muted">
-            7 dias grátis, sem cartão. Cancele quando quiser.
+            7 dias grátis pra sentir a diferença.
           </p>
           <Link
             href="/login?mode=signup"
