@@ -8,6 +8,7 @@ import type { Task } from "@/types/database";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Não deu pra carregar suas tarefas agora. Tenta de novo em instantes.";
 
 type Visao = "hoje" | "semana";
 
@@ -53,21 +54,29 @@ export default function TarefasPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData, error: erroUsuario } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) {
+    if (erroUsuario || !userId) {
+      mostrarToast(MSG_ERRO_CARREGAR);
       setLoading(false);
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("tasks")
       .select("*")
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true });
 
+    if (error) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+      setLoading(false);
+      return;
+    }
+
     setTasks((data as Task[]) ?? []);
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   useEffect(() => {
@@ -79,9 +88,13 @@ export default function TarefasPage() {
     if (!novoTitulo.trim()) return;
     setSalvando(true);
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData, error: erroUsuario } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (erroUsuario || !userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     const { error } = await supabase.from("tasks").insert({
       user_id: userId,
