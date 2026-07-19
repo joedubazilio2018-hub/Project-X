@@ -94,4 +94,3 @@ middleware.ts           → protege rotas, exige login
 
 - **Parte 2:** Metas de longo prazo + Diário de reflexão
 - **Parte 3:** Finanças (lançamentos, categorias, metas financeiras, gráficos)
-
