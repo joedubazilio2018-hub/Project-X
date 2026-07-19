@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 
@@ -58,10 +59,11 @@ export default function Sidebar({ souAdmin = false }: { souAdmin?: boolean }) {
   return (
     <aside className="hidden h-screen w-56 flex-col border-r border-base-border bg-base-surface px-4 py-6 md:flex">
       <div className="mb-8 flex items-center gap-3 px-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/logo-mark.png"
           alt="ASCEN"
+          width={88}
+          height={88}
           className="h-11 w-11 object-contain"
         />
         <div>
