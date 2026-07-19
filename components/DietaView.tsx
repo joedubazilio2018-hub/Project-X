@@ -415,7 +415,7 @@ export default function DietaView() {
             <div>
               <p className="text-xs text-ink-faint">Seu gasto calórico estimado (TDEE)</p>
               <p className="font-display text-2xl font-bold text-ink">{Math.round(tdee ?? 0)} kcal/dia</p>
-              <p className="mt-0.5 text-xs text-ink-faint">TMB: {Math.round(tmb ?? 0)} kcal · {LABEL_ATIVIDADE[metrics!.activity_level]}</p>
+              <p className="mt-0.5 text-xs text-ink-faint">TMB: {Math.round(tmb ?? 0)} kcal · {metrics ? LABEL_ATIVIDADE[metrics.activity_level] : ""}</p>
             </div>
             <button onClick={abrirEdicaoPerfil} className="text-sm font-medium text-accent hover:opacity-80">
               Editar
