@@ -10,6 +10,7 @@ import { CORES_CATEGORIA as CORES } from "@/lib/cores";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Alguns dados podem não ter carregado. Puxa a tela pra atualizar.";
 
 function hojeISO(): string {
   const d = new Date();
@@ -53,21 +54,26 @@ export default function HabitosPage() {
       return;
     }
 
-    const { data: habitsData } = await supabase
+    let houveErro = false;
+
+    const { data: habitsData, error: habitsError } = await supabase
       .from("habits")
       .select("*")
       .eq("archived", false)
       .order("created_at", { ascending: true });
+    if (habitsError) houveErro = true;
 
-    const { data: categoriesData } = await supabase
+    const { data: categoriesData, error: categoriesError } = await supabase
       .from("habit_categories")
       .select("*")
       .order("created_at", { ascending: true });
+    if (categoriesError) houveErro = true;
 
-    const { data: logsData } = await supabase
+    const { data: logsData, error: logsError } = await supabase
       .from("habit_logs")
       .select("*")
       .eq("date", hojeISO());
+    if (logsError) houveErro = true;
 
     const mapaLogs: Record<string, boolean> = {};
     (logsData as HabitLog[] | null)?.forEach((log) => {
@@ -78,7 +84,11 @@ export default function HabitosPage() {
     setCategories((categoriesData as HabitCategory[]) ?? []);
     setLogsHoje(mapaLogs);
     setLoading(false);
-  }, [supabase]);
+
+    if (houveErro) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+    }
+  }, [supabase, mostrarToast]);
 
   useEffect(() => {
     carregar();
@@ -92,7 +102,11 @@ export default function HabitosPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     const cat = categories.find((c) => c.id === novaCategoriaId);
 
@@ -148,7 +162,10 @@ export default function HabitosPage() {
   async function alternarCheckin(habitId: string) {
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     const feitoAnterior = !!logsHoje[habitId];
     const feitoAgora = !feitoAnterior;
@@ -193,7 +210,11 @@ export default function HabitosPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     const cor = CORES[categories.length % CORES.length];
 
