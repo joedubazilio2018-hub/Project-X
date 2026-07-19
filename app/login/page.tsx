@@ -147,13 +147,13 @@ function LoginConteudo() {
         </Link>
 
         <div className="mb-8 text-center">
-          <Image
+                    <Image
             src="/logo-mark.png"
             alt="ASCEN"
-            width={160}
-            height={160}
+            width={220}
+            height={220}
             priority
-            className="mx-auto mb-4 h-20 w-20 object-contain"
+            className="mx-auto mb-4 h-32 w-32 object-contain"
           />
           <p className="mt-3 text-sm text-ink-muted">
             Hábitos, metas e rotina. Sem desculpas.
@@ -276,16 +276,16 @@ function LoginConteudo() {
           </form>
         </div>
 
-        <div className="mt-10 text-center">
+                <div className="mt-10 text-center">
           <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-ink-faint">
             desenvolvido por
           </p>
           <Image
             src="/jb-group-logo.png"
             alt="JB Group"
-            width={210}
-            height={140}
-            className="mx-auto h-10 w-auto object-contain"
+            width={320}
+            height={213}
+            className="mx-auto h-20 w-auto object-contain"
           />
         </div>
       </div>
