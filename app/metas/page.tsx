@@ -6,6 +6,9 @@ import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
 import type { Goal, GoalStatus, GoalCategory, GoalItem } from "@/types/database";
 import { CORES_CATEGORIA as CORES } from "@/lib/cores";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -27,6 +30,7 @@ const STATUS_ORDER: GoalStatus[] = ["in_progress", "not_started", "done"];
 
 export default function MetasPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [categories, setCategories] = useState<GoalCategory[]>([]);
   const [items, setItems] = useState<GoalItem[]>([]);
@@ -130,11 +134,14 @@ export default function MetasPage() {
       setEnviandoImagem(true);
       urlImagem = await enviarImagemMeta(imagemArquivo, userId);
       setEnviandoImagem(false);
+      if (!urlImagem) {
+        mostrarToast("Não deu pra enviar a imagem, mas vou salvar a meta sem ela.");
+      }
     }
 
     const valorAlvoNum = parseFloat(valorAlvo.replace(",", "."));
 
-    const { data: novaMeta } = await supabase
+    const { data: novaMeta, error: erroMeta } = await supabase
       .from("goals")
       .insert({
         user_id: userId,
@@ -150,13 +157,19 @@ export default function MetasPage() {
       .select()
       .single();
 
+    if (erroMeta) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
+
     const linhas = itensNovaMeta
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
     if (novaMeta && linhas.length > 0) {
-      await supabase.from("goal_items").insert(
+      const { error: erroItens } = await supabase.from("goal_items").insert(
         linhas.map((content, i) => ({
           goal_id: novaMeta.id,
           user_id: userId,
@@ -164,6 +177,9 @@ export default function MetasPage() {
           position: i,
         }))
       );
+      if (erroItens) {
+        mostrarToast("Meta criada, mas os tópicos não foram salvos. Adicione de novo.");
+      }
     }
 
     setTitulo("");
@@ -190,12 +206,17 @@ export default function MetasPage() {
     const itensDaMeta = items.filter((i) => i.goal_id === goalId);
     const proximaPosicao = itensDaMeta.length;
 
-    await supabase.from("goal_items").insert({
+    const { error } = await supabase.from("goal_items").insert({
       goal_id: goalId,
       user_id: userId,
       content: texto,
       position: proximaPosicao,
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     setNovoItemTexto((prev) => ({ ...prev, [goalId]: "" }));
     carregar();
@@ -207,7 +228,18 @@ export default function MetasPage() {
       i.id === item.id ? { ...i, done: novoDone } : i
     );
     setItems(novosItems);
-    await supabase.from("goal_items").update({ done: novoDone }).eq("id", item.id);
+    const { error } = await supabase
+      .from("goal_items")
+      .update({ done: novoDone })
+      .eq("id", item.id);
+
+    if (error) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, done: item.done } : i))
+      );
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     const itensDaMeta = novosItems.filter((i) => i.goal_id === item.goal_id);
     const meta = goals.find((g) => g.id === item.goal_id);
@@ -223,7 +255,11 @@ export default function MetasPage() {
 
   async function excluirItem(item: GoalItem) {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
-    await supabase.from("goal_items").delete().eq("id", item.id);
+    const { error } = await supabase.from("goal_items").delete().eq("id", item.id);
+    if (error) {
+      setItems((prev) => [...prev, item]);
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   function iniciarEdicao(goal: Goal) {
@@ -255,7 +291,7 @@ export default function MetasPage() {
 
     const valorAlvoNum = parseFloat(editValorAlvo.replace(",", "."));
 
-    await supabase
+    const { error } = await supabase
       .from("goals")
       .update({
         title: editTitulo.trim(),
@@ -266,6 +302,11 @@ export default function MetasPage() {
         image_url: urlImagem,
       })
       .eq("id", goalId);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     setEditandoId(null);
     setEditImagemArquivo(null);
@@ -278,26 +319,51 @@ export default function MetasPage() {
     const valor = parseFloat(bruto);
     if (!valor || valor <= 0) return;
 
-    const novoValor = Number((Number(goal.current_amount || 0) + valor).toFixed(2));
+    const valorAnterior = Number(goal.current_amount || 0);
+    const novoValor = Number((valorAnterior + valor).toFixed(2));
 
     setGoals((prev) =>
       prev.map((g) => (g.id === goal.id ? { ...g, current_amount: novoValor } : g))
     );
     setValorGuardar((prev) => ({ ...prev, [goal.id]: "" }));
 
-    await supabase.from("goals").update({ current_amount: novoValor }).eq("id", goal.id);
+    const { error } = await supabase
+      .from("goals")
+      .update({ current_amount: novoValor })
+      .eq("id", goal.id);
+
+    if (error) {
+      setGoals((prev) =>
+        prev.map((g) => (g.id === goal.id ? { ...g, current_amount: valorAnterior } : g))
+      );
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function mudarStatus(goalId: string, status: GoalStatus) {
+    const statusAnterior = goals.find((g) => g.id === goalId)?.status;
     setGoals((prev) =>
       prev.map((g) => (g.id === goalId ? { ...g, status } : g))
     );
-    await supabase.from("goals").update({ status }).eq("id", goalId);
+    const { error } = await supabase.from("goals").update({ status }).eq("id", goalId);
+    if (error) {
+      if (statusAnterior) {
+        setGoals((prev) =>
+          prev.map((g) => (g.id === goalId ? { ...g, status: statusAnterior } : g))
+        );
+      }
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function excluirMeta(goalId: string) {
+    const metaRemovida = goals.find((g) => g.id === goalId) ?? null;
     setGoals((prev) => prev.filter((g) => g.id !== goalId));
-    await supabase.from("goals").delete().eq("id", goalId);
+    const { error } = await supabase.from("goals").delete().eq("id", goalId);
+    if (error) {
+      if (metaRemovida) setGoals((prev) => [...prev, metaRemovida]);
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function criarCategoria(e: React.FormEvent) {
@@ -311,11 +377,17 @@ export default function MetasPage() {
 
     const cor = CORES[categories.length % CORES.length];
 
-    await supabase.from("goal_categories").insert({
+    const { error } = await supabase.from("goal_categories").insert({
       user_id: userId,
       name: novaCategoriaNome.trim(),
       color: cor,
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     setNovaCategoriaNome("");
     setMostrarFormCategoria(false);
@@ -330,16 +402,25 @@ export default function MetasPage() {
 
   async function salvarEdicaoCategoria(categoriaId: string) {
     if (!editCategoriaNome.trim()) return;
-    await supabase
+    const { error } = await supabase
       .from("goal_categories")
       .update({ name: editCategoriaNome.trim() })
       .eq("id", categoriaId);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     setEditandoCategoriaId(null);
     carregar();
   }
 
   async function excluirCategoria(categoriaId: string) {
-    await supabase.from("goal_categories").delete().eq("id", categoriaId);
+    const { error } = await supabase.from("goal_categories").delete().eq("id", categoriaId);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
