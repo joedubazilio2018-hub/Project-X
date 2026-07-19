@@ -11,6 +11,7 @@ import type {
 } from "@/types/database";
 import { CORES_CATEGORIA } from "@/lib/cores";
 import { useToast } from "@/components/ToastProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { adicionarMeses, estaAtrasada, hojeISO } from "@/lib/financas-utils";
 import ResumoCards from "@/components/financas/ResumoCards";
 import GraficosFinancas from "@/components/financas/GraficosFinancas";
@@ -29,6 +30,7 @@ const LANCAMENTOS_POR_PAGINA = 50;
 export default function FinancasPage() {
   const supabase = createClient();
   const { mostrarToast } = useToast();
+  const confirmar = useConfirm();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -285,9 +287,14 @@ export default function FinancasPage() {
 
   async function excluirLancamento(t: Transaction) {
     if (t.recurrence_group_id) {
-      const apagarTodas = window.confirm(
-        "Esse lançamento faz parte de uma recorrência/parcelamento. Clique OK para apagar TODAS as parcelas, ou Cancelar para apagar apenas esta parcela."
-      );
+      const apagarTodas = await confirmar({
+        titulo: "Apagar parcelas",
+        mensagem:
+          "Esse lançamento faz parte de uma recorrência/parcelamento. Apagar todas as parcelas, ou só esta?",
+        textoConfirmar: "Apagar todas",
+        textoCancelar: "Apagar só esta",
+        destrutivo: true,
+      });
       if (apagarTodas) {
         const parcelasDoGrupo = transactions.filter(
           (tx) => tx.recurrence_group_id === t.recurrence_group_id
