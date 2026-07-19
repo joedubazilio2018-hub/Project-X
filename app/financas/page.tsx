@@ -23,6 +23,10 @@ import type {
   Goal,
 } from "@/types/database";
 import { CORES_CATEGORIA } from "@/lib/cores";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Alguns dados podem não ter carregado. Puxa a tela pra atualizar.";
 
 type MetaVinculavel = Pick<Goal, "id" | "title" | "target_amount" | "current_amount">;
 
@@ -66,6 +70,7 @@ function estaAtrasada(t: Transaction): boolean {
 
 export default function FinancasPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -99,25 +104,36 @@ export default function FinancasPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data: t } = await supabase
+    let houveErro = false;
+
+    const { data: t, error: erroT } = await supabase
       .from("transactions")
       .select("*")
       .order("date", { ascending: false });
-    const { data: c } = await supabase
+    if (erroT) houveErro = true;
+
+    const { data: c, error: erroC } = await supabase
       .from("categories")
       .select("*")
       .order("created_at", { ascending: true });
-    const { data: g } = await supabase
+    if (erroC) houveErro = true;
+
+    const { data: g, error: erroG } = await supabase
       .from("goals")
       .select("id, title, target_amount, current_amount")
       .not("target_amount", "is", null)
       .order("created_at", { ascending: false });
+    if (erroG) houveErro = true;
 
     setTransactions((t as Transaction[]) ?? []);
     setCategories((c as Category[]) ?? []);
     setMetasVinculaveis((g as MetaVinculavel[]) ?? []);
     setLoading(false);
-  }, [supabase]);
+
+    if (houveErro) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+    }
+  }, [supabase, mostrarToast]);
 
   useEffect(() => {
     carregar();
@@ -185,58 +201,34 @@ export default function FinancasPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     setEnviandoPoupancaId(goal.id);
 
     try {
       const categoriaId = await encontrarOuCriarCategoriaDaMeta(goal.id, goal.title, userId);
 
-      await supabase.from("transactions").insert({
-        user_id: userId,
-        type: "expense",
-        amount: valorNum,
-        category_id: categoriaId,
-        description: `Guardado para "${goal.title}"`,
-        date: hojeISO(),
-        paid: true,
+      const { error } = await supabase.rpc("fn_guardar_poupanca", {
+        p_goal_id: goal.id,
+        p_valor: valorNum,
+        p_category_id: categoriaId,
+        p_descricao: `Guardado para "${goal.title}"`,
       });
 
-      const { data: metaAtual } = await supabase
-        .from("goals")
-        .select("current_amount")
-        .eq("id", goal.id)
-        .single();
-      const atual = Number(metaAtual?.current_amount ?? 0);
-      const novoValor = Number((atual + valorNum).toFixed(2));
-      await supabase.from("goals").update({ current_amount: novoValor }).eq("id", goal.id);
+      if (error) throw error;
 
       setValorPoupanca((prev) => ({ ...prev, [goal.id]: "" }));
       setPaginaAtual(1);
       carregar();
     } catch (err) {
       console.error("Erro ao guardar na poupança:", err);
-      alert("Não deu pra guardar esse valor agora. Tenta de novo em instantes.");
+      mostrarToast("Não deu pra guardar esse valor agora. Tenta de novo em instantes.");
     } finally {
       setEnviandoPoupancaId(null);
     }
-  }
-
-  async function ajustarMetaVinculada(categoryId: string | null | undefined, delta: number) {
-    if (!categoryId || !delta) return;
-    const cat = categories.find((c) => c.id === categoryId);
-    if (!cat?.linked_goal_id) return;
-
-    const { data: metaAtual } = await supabase
-      .from("goals")
-      .select("current_amount")
-      .eq("id", cat.linked_goal_id)
-      .single();
-
-    const atual = Number(metaAtual?.current_amount ?? 0);
-    const novoValor = Number((atual + delta).toFixed(2));
-
-    await supabase.from("goals").update({ current_amount: novoValor }).eq("id", cat.linked_goal_id);
   }
 
   async function salvarLancamento(e: React.FormEvent) {
@@ -246,12 +238,7 @@ export default function FinancasPage() {
     setSalvando(true);
 
     if (editandoTransacao) {
-      const camposComuns = {
-        type: tipo,
-        amount: valorNum,
-        category_id: categoriaId || null,
-        description: descricao.trim() || null,
-      };
+      let error: { message: string } | null = null;
 
       if (aplicarEmTodasParcelas && editandoTransacao.recurrence_group_id) {
         const parcelasDoGrupo = transactions.filter(
@@ -259,56 +246,46 @@ export default function FinancasPage() {
         );
         const totalAntigo = parcelasDoGrupo.reduce((s, t) => s + t.amount, 0);
 
-        await supabase
-          .from("transactions")
-          .update(camposComuns)
-          .eq("recurrence_group_id", editandoTransacao.recurrence_group_id);
-
-        await ajustarMetaVinculada(editandoTransacao.category_id, -totalAntigo);
-        await ajustarMetaVinculada(categoriaId || null, valorNum * parcelasDoGrupo.length);
+        ({ error } = await supabase.rpc("fn_editar_lancamento_grupo", {
+          p_recurrence_group_id: editandoTransacao.recurrence_group_id,
+          p_type: tipo,
+          p_amount: valorNum,
+          p_category_id: categoriaId || null,
+          p_description: descricao.trim() || null,
+          p_old_category_id: editandoTransacao.category_id,
+          p_old_total: totalAntigo,
+        }));
       } else if (!editandoTransacao.recurrence_group_id && repetir) {
         const qtdParcelas = Math.max(2, parseInt(totalParcelas, 10) || 2);
-        const grupoId = crypto.randomUUID();
+        const datas = Array.from({ length: qtdParcelas }).map((_, i) => adicionarMeses(data, i));
 
-        await supabase
-          .from("transactions")
-          .update({
-            ...camposComuns,
-            date: data,
-            recurrence_group_id: grupoId,
-            installment_number: 1,
-            installment_total: qtdParcelas,
-          })
-          .eq("id", editandoTransacao.id);
-
-        const novasParcelas = Array.from({ length: qtdParcelas - 1 }).map(
-          (_, i) => ({
-            user_id: editandoTransacao.user_id,
-            type: tipo,
-            amount: valorNum,
-            category_id: categoriaId || null,
-            description: descricao.trim() || null,
-            date: adicionarMeses(data, i + 1),
-            recurrence_group_id: grupoId,
-            installment_number: i + 2,
-            installment_total: qtdParcelas,
-          })
-        );
-
-        if (novasParcelas.length > 0) {
-          await supabase.from("transactions").insert(novasParcelas);
-        }
-
-        await ajustarMetaVinculada(editandoTransacao.category_id, -editandoTransacao.amount);
-        await ajustarMetaVinculada(categoriaId || null, valorNum * qtdParcelas);
+        ({ error } = await supabase.rpc("fn_editar_lancamento_recorrente", {
+          p_transaction_id: editandoTransacao.id,
+          p_type: tipo,
+          p_amount: valorNum,
+          p_category_id: categoriaId || null,
+          p_description: descricao.trim() || null,
+          p_dates: datas,
+          p_old_category_id: editandoTransacao.category_id,
+          p_old_amount: editandoTransacao.amount,
+        }));
       } else {
-        await supabase
-          .from("transactions")
-          .update({ ...camposComuns, date: data })
-          .eq("id", editandoTransacao.id);
+        ({ error } = await supabase.rpc("fn_editar_lancamento_simples", {
+          p_transaction_id: editandoTransacao.id,
+          p_type: tipo,
+          p_amount: valorNum,
+          p_category_id: categoriaId || null,
+          p_description: descricao.trim() || null,
+          p_date: data,
+          p_old_category_id: editandoTransacao.category_id,
+          p_old_amount: editandoTransacao.amount,
+        }));
+      }
 
-        await ajustarMetaVinculada(editandoTransacao.category_id, -editandoTransacao.amount);
-        await ajustarMetaVinculada(categoriaId || null, valorNum);
+      if (error) {
+        mostrarToast(MSG_ERRO_PADRAO);
+        setSalvando(false);
+        return;
       }
 
       resetFormLancamento();
@@ -320,27 +297,27 @@ export default function FinancasPage() {
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
       setSalvando(false);
       return;
     }
 
     const qtdParcelas = repetir ? Math.max(2, parseInt(totalParcelas, 10) || 2) : 1;
-    const grupoId = qtdParcelas > 1 ? crypto.randomUUID() : null;
+    const datas = Array.from({ length: qtdParcelas }).map((_, i) => adicionarMeses(data, i));
 
-    const linhas = Array.from({ length: qtdParcelas }).map((_, i) => ({
-      user_id: userId,
-      type: tipo,
-      amount: valorNum,
-      category_id: categoriaId || null,
-      description: descricao.trim() || null,
-      date: adicionarMeses(data, i),
-      recurrence_group_id: grupoId,
-      installment_number: qtdParcelas > 1 ? i + 1 : null,
-      installment_total: qtdParcelas > 1 ? qtdParcelas : null,
-    }));
+    const { error } = await supabase.rpc("fn_criar_lancamento", {
+      p_type: tipo,
+      p_amount: valorNum,
+      p_category_id: categoriaId || null,
+      p_description: descricao.trim() || null,
+      p_dates: datas,
+    });
 
-    await supabase.from("transactions").insert(linhas);
-    await ajustarMetaVinculada(categoriaId || null, valorNum * qtdParcelas);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     resetFormLancamento();
     setPaginaAtual(1);
@@ -362,17 +339,33 @@ export default function FinancasPage() {
         setTransactions((prev) =>
           prev.filter((tx) => tx.recurrence_group_id !== t.recurrence_group_id)
         );
-        await supabase
-          .from("transactions")
-          .delete()
-          .eq("recurrence_group_id", t.recurrence_group_id);
-        await ajustarMetaVinculada(t.category_id, -totalGrupo);
+
+        const { error } = await supabase.rpc("fn_excluir_lancamento_grupo", {
+          p_recurrence_group_id: t.recurrence_group_id,
+          p_category_id: t.category_id,
+          p_total: totalGrupo,
+        });
+
+        if (error) {
+          mostrarToast(MSG_ERRO_PADRAO);
+          carregar();
+        }
         return;
       }
     }
+
     setTransactions((prev) => prev.filter((tx) => tx.id !== t.id));
-    await supabase.from("transactions").delete().eq("id", t.id);
-    await ajustarMetaVinculada(t.category_id, -t.amount);
+
+    const { error } = await supabase.rpc("fn_excluir_lancamento_simples", {
+      p_transaction_id: t.id,
+      p_category_id: t.category_id,
+      p_amount: t.amount,
+    });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      carregar();
+    }
   }
 
   async function alternarPago(t: Transaction) {
@@ -380,7 +373,17 @@ export default function FinancasPage() {
     setTransactions((prev) =>
       prev.map((tx) => (tx.id === t.id ? { ...tx, paid: novoPago } : tx))
     );
-    await supabase.from("transactions").update({ paid: novoPago }).eq("id", t.id);
+    const { error } = await supabase
+      .from("transactions")
+      .update({ paid: novoPago })
+      .eq("id", t.id);
+
+    if (error) {
+      setTransactions((prev) =>
+        prev.map((tx) => (tx.id === t.id ? { ...tx, paid: t.paid } : tx))
+      );
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function criarCategoria(e: React.FormEvent) {
@@ -390,16 +393,26 @@ export default function FinancasPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     const cor = CORES_CATEGORIA[categories.length % CORES_CATEGORIA.length];
 
-    await supabase.from("categories").insert({
+    const { error } = await supabase.from("categories").insert({
       user_id: userId,
       name: novaCategoria.trim(),
       color: cor,
       linked_goal_id: novaCategoriaMetaId || null,
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     setNovaCategoria("");
     setNovaCategoriaMetaId("");
@@ -409,18 +422,31 @@ export default function FinancasPage() {
   }
 
   async function excluirCategoria(id: string) {
+    const categoriaRemovida = categories.find((c) => c.id === id) ?? null;
     setCategories((prev) => prev.filter((c) => c.id !== id));
-    await supabase.from("categories").delete().eq("id", id);
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    if (error) {
+      if (categoriaRemovida) setCategories((prev) => [...prev, categoriaRemovida]);
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function vincularCategoriaAMeta(categoryId: string, goalId: string) {
+    const anterior = categories.find((c) => c.id === categoryId)?.linked_goal_id ?? null;
     setCategories((prev) =>
       prev.map((c) => (c.id === categoryId ? { ...c, linked_goal_id: goalId || null } : c))
     );
-    await supabase
+    const { error } = await supabase
       .from("categories")
       .update({ linked_goal_id: goalId || null })
       .eq("id", categoryId);
+
+    if (error) {
+      setCategories((prev) =>
+        prev.map((c) => (c.id === categoryId ? { ...c, linked_goal_id: anterior } : c))
+      );
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   // ── Cálculos derivados ──
