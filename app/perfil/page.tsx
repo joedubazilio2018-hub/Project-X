@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 export default function PerfilPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [nome, setNome] = useState("");
   const [idade, setIdade] = useState("");
   const [loading, setLoading] = useState(true);
@@ -13,12 +17,18 @@ export default function PerfilPage() {
   const [sucesso, setSucesso] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error) {
+        mostrarToast(MSG_ERRO_PADRAO);
+        setLoading(false);
+        return;
+      }
       const meta = data.user?.user_metadata;
       setNome((meta?.nome as string) ?? "");
       setIdade(meta?.idade ? String(meta.idade) : "");
       setLoading(false);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   async function salvar(e: React.FormEvent) {
@@ -26,7 +36,7 @@ export default function PerfilPage() {
     setSalvando(true);
     setSucesso(false);
 
-    await supabase.auth.updateUser({
+    const { error } = await supabase.auth.updateUser({
       data: {
         nome: nome.trim(),
         idade: idade ? parseInt(idade, 10) : null,
@@ -34,6 +44,12 @@ export default function PerfilPage() {
     });
 
     setSalvando(false);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
+
     setSucesso(true);
   }
 
