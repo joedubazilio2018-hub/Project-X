@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const INTENSIDADE_GRADE: number[] = [
   0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 2, 1, 1, 1, 0, 0,
@@ -32,10 +33,12 @@ export default function LandingPage() {
       {/* Header */}
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/logo-mark.png"
             alt="ASCEN"
+            width={96}
+            height={96}
+            priority
             className="h-12 w-12 object-contain"
           />
           <span className="font-display text-xl font-bold tracking-tight">ASCEN</span>
