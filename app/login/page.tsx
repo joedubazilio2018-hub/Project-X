@@ -243,9 +243,6 @@ function LoginConteudo() {
                 <span className="text-xl">🎁</span>
                 <p className="text-sm text-accent">
                   <span className="font-bold">7 dias grátis</span> pra testar tudo.
-                  <span className="block text-xs font-normal opacity-80">
-                    Sem cartão de crédito agora.
-                  </span>
                 </p>
               </div>
             )}
