@@ -9,6 +9,7 @@ import { CORES_CATEGORIA as CORES } from "@/lib/cores";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Alguns dados podem não ter carregado. Puxa a tela pra atualizar.";
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -71,24 +72,35 @@ export default function MetasPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    let houveErro = false;
+
+    const { data, error: erroGoals } = await supabase
       .from("goals")
       .select("*")
       .order("created_at", { ascending: false });
-    const { data: cats } = await supabase
+    if (erroGoals) houveErro = true;
+
+    const { data: cats, error: erroCats } = await supabase
       .from("goal_categories")
       .select("*")
       .order("created_at", { ascending: true });
-    const { data: goalItems } = await supabase
+    if (erroCats) houveErro = true;
+
+    const { data: goalItems, error: erroItems } = await supabase
       .from("goal_items")
       .select("*")
       .order("position", { ascending: true });
+    if (erroItems) houveErro = true;
 
     setGoals((data as Goal[]) ?? []);
     setCategories((cats as GoalCategory[]) ?? []);
     setItems((goalItems as GoalItem[]) ?? []);
     setLoading(false);
-  }, [supabase]);
+
+    if (houveErro) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+    }
+  }, [supabase, mostrarToast]);
 
   useEffect(() => {
     carregar();
@@ -127,7 +139,11 @@ export default function MetasPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     let urlImagem: string | null = null;
     if (imagemArquivo) {
@@ -201,7 +217,10 @@ export default function MetasPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     const itensDaMeta = items.filter((i) => i.goal_id === goalId);
     const proximaPosicao = itensDaMeta.length;
@@ -373,7 +392,11 @@ export default function MetasPage() {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     const cor = CORES[categories.length % CORES.length];
 
