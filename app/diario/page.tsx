@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import type { JournalEntry, Mood } from "@/types/database";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 const MOOD_OPTIONS: { value: Mood; label: string; emoji: string }[] = [
   { value: "great", label: "Ótimo", emoji: "😄" },
@@ -18,6 +21,7 @@ function hojeISO(): string {
 
 export default function DiarioPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [conteudo, setConteudo] = useState("");
@@ -59,18 +63,22 @@ export default function DiarioPage() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    if (entradaHojeId) {
-      await supabase
-        .from("journal_entries")
-        .update({ content: conteudo.trim(), mood: moodSelecionado })
-        .eq("id", entradaHojeId);
-    } else {
-      await supabase.from("journal_entries").insert({
-        user_id: userId,
-        content: conteudo.trim(),
-        mood: moodSelecionado,
-        entry_date: hojeISO(),
-      });
+    const { error } = entradaHojeId
+      ? await supabase
+          .from("journal_entries")
+          .update({ content: conteudo.trim(), mood: moodSelecionado })
+          .eq("id", entradaHojeId)
+      : await supabase.from("journal_entries").insert({
+          user_id: userId,
+          content: conteudo.trim(),
+          mood: moodSelecionado,
+          entry_date: hojeISO(),
+        });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
     }
 
     setSalvando(false);
