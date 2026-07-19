@@ -9,6 +9,7 @@ import type { Workout, WorkoutExercise, WorkoutSession } from "@/types/database"
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Alguns dados podem não ter carregado. Puxa a tela pra atualizar.";
 
 type ExercicioForm = {
   tempId: string;
@@ -73,28 +74,34 @@ function TreinosConteudo() {
       return;
     }
 
-    const { data: workoutsData } = await supabase
+    let houveErro = false;
+
+    const { data: workoutsData, error: erroWorkouts } = await supabase
       .from("workouts")
       .select("*")
       .eq("archived", false)
       .order("position", { ascending: true });
+    if (erroWorkouts) houveErro = true;
 
-    const { data: exerciciosData } = await supabase
+    const { data: exerciciosData, error: erroExercicios } = await supabase
       .from("workout_exercises")
       .select("*")
       .order("position", { ascending: true });
+    if (erroExercicios) houveErro = true;
 
-    const { data: sessoesData } = await supabase
+    const { data: sessoesData, error: erroSessoes } = await supabase
       .from("workout_sessions")
       .select("*")
       .not("finished_at", "is", null)
       .order("finished_at", { ascending: false })
       .limit(10);
+    if (erroSessoes) houveErro = true;
 
-    const { data: catalogoData } = await supabase
+    const { data: catalogoData, error: erroCatalogo } = await supabase
       .from("exercise_catalog")
       .select("name")
       .order("name", { ascending: true });
+    if (erroCatalogo) houveErro = true;
 
     setCatalogoExercicios(((catalogoData as { name: string }[] | null) ?? []).map((c) => c.name));
 
@@ -108,7 +115,11 @@ function TreinosConteudo() {
     setExerciciosPorTreino(mapa);
     setSessoes((sessoesData as WorkoutSession[]) ?? []);
     setLoading(false);
-  }, [supabase]);
+
+    if (houveErro) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+    }
+  }, [supabase, mostrarToast]);
 
   useEffect(() => {
     carregar();
@@ -185,7 +196,11 @@ function TreinosConteudo() {
     setSalvando(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     if (formAberto === "novo") {
       const { data: novaRotina, error: erroRotina } = await supabase
@@ -290,7 +305,10 @@ function TreinosConteudo() {
     if (!sessaoAtiva) return;
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     const { error } = await supabase.from("workout_sessions").insert({
       user_id: userId,
