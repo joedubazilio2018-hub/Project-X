@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 type InviteCode = {
   id: string;
@@ -28,6 +31,7 @@ function gerarCodigoAleatorio(): string {
 
 export default function AdminPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const [verificandoAdmin, setVerificandoAdmin] = useState(true);
   const [souAdmin, setSouAdmin] = useState(false);
 
@@ -67,12 +71,18 @@ export default function AdminPage() {
     if (!novoCodigo.trim()) return;
     setSalvando(true);
 
-    await supabase.from("invite_codes").insert({
+    const { error } = await supabase.from("invite_codes").insert({
       code: novoCodigo.trim().toUpperCase(),
       max_uses: Math.max(1, parseInt(maxUsos, 10) || 1),
       expires_at: validade || null,
       note: nota.trim() || null,
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     setNovoCodigo(gerarCodigoAleatorio());
     setMaxUsos("1");
@@ -87,15 +97,27 @@ export default function AdminPage() {
     setCodigos((prev) =>
       prev.map((c) => (c.id === codigo.id ? { ...c, active: !c.active } : c))
     );
-    await supabase
+    const { error } = await supabase
       .from("invite_codes")
       .update({ active: !codigo.active })
       .eq("id", codigo.id);
+
+    if (error) {
+      setCodigos((prev) =>
+        prev.map((c) => (c.id === codigo.id ? { ...c, active: codigo.active } : c))
+      );
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   async function excluirCodigo(id: string) {
+    const codigoRemovido = codigos.find((c) => c.id === id) ?? null;
     setCodigos((prev) => prev.filter((c) => c.id !== id));
-    await supabase.from("invite_codes").delete().eq("id", id);
+    const { error } = await supabase.from("invite_codes").delete().eq("id", id);
+    if (error) {
+      if (codigoRemovido) setCodigos((prev) => [...prev, codigoRemovido]);
+      mostrarToast(MSG_ERRO_PADRAO);
+    }
   }
 
   function copiar(codigo: string) {
