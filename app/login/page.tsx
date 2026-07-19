@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
@@ -146,10 +147,12 @@ function LoginConteudo() {
         </Link>
 
         <div className="mb-8 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/logo-mark.png"
             alt="ASCEN"
+            width={160}
+            height={160}
+            priority
             className="mx-auto mb-4 h-20 w-20 object-contain"
           />
           <h1 className="font-display text-2xl font-bold text-ink">
