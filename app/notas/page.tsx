@@ -9,6 +9,7 @@ import type { Note, NoteColor } from "@/types/database";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Não deu pra carregar suas notas agora. Tenta de novo em instantes.";
 
 export default function NotasPage() {
   const supabase = createClient();
@@ -24,12 +25,20 @@ export default function NotasPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notes")
       .select("*")
       .order("updated_at", { ascending: false });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+      setLoading(false);
+      return;
+    }
+
     setNotes((data as Note[]) ?? []);
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   useEffect(() => {
@@ -74,9 +83,10 @@ export default function NotasPage() {
       }
     } else {
       // criação
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: erroUsuario } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) {
+      if (erroUsuario || !userId) {
+        mostrarToast(MSG_ERRO_PADRAO);
         setSalvando(false);
         return;
       }
