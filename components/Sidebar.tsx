@@ -68,7 +68,6 @@ export default function Sidebar({ souAdmin = false }: { souAdmin?: boolean }) {
         />
         <div>
           <h1 className="font-display text-base font-bold leading-tight text-ink">ASCEN</h1>
-          <p className="text-xs text-ink-faint">by JB Group</p>
         </div>
       </div>
       <NavLinks items={navItems} />
