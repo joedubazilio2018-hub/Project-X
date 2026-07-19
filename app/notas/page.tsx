@@ -6,9 +6,13 @@ import AppShell from "@/components/AppShell";
 import NotaCard from "@/components/NotaCard";
 import NotaModal from "@/components/NotaModal";
 import type { Note, NoteColor } from "@/types/database";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 export default function NotasPage() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,14 +56,22 @@ export default function NotasPage() {
 
     if (notaSelecionada) {
       // edição
+      const anterior = notaSelecionada;
       const atualizada = { ...notaSelecionada, ...dados, updated_at: new Date().toISOString() };
       setNotes((prev) =>
         prev.map((n) => (n.id === notaSelecionada.id ? atualizada : n))
       );
-      await supabase
+      const { error } = await supabase
         .from("notes")
         .update({ ...dados, updated_at: new Date().toISOString() })
         .eq("id", notaSelecionada.id);
+
+      if (error) {
+        setNotes((prev) => prev.map((n) => (n.id === anterior.id ? anterior : n)));
+        mostrarToast(MSG_ERRO_PADRAO);
+        setSalvando(false);
+        return;
+      }
     } else {
       // criação
       const { data: userData } = await supabase.auth.getUser();
@@ -68,7 +80,12 @@ export default function NotasPage() {
         setSalvando(false);
         return;
       }
-      await supabase.from("notes").insert({ ...dados, user_id: userId });
+      const { error } = await supabase.from("notes").insert({ ...dados, user_id: userId });
+      if (error) {
+        mostrarToast(MSG_ERRO_PADRAO);
+        setSalvando(false);
+        return;
+      }
       carregar();
     }
 
@@ -77,8 +94,14 @@ export default function NotasPage() {
   }
 
   async function excluirNota(id: string) {
+    const notaRemovida = notes.find((n) => n.id === id) ?? null;
     setNotes((prev) => prev.filter((n) => n.id !== id));
-    await supabase.from("notes").delete().eq("id", id);
+    const { error } = await supabase.from("notes").delete().eq("id", id);
+    if (error) {
+      if (notaRemovida) setNotes((prev) => [...prev, notaRemovida]);
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     fecharModal();
   }
 
