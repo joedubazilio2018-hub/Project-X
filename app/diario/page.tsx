@@ -7,6 +7,7 @@ import type { JournalEntry, Mood } from "@/types/database";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Não deu pra carregar suas entradas agora. Tenta de novo em instantes.";
 
 const MOOD_OPTIONS: { value: Mood; label: string; emoji: string }[] = [
   { value: "great", label: "Ótimo", emoji: "😄" },
@@ -31,11 +32,17 @@ export default function DiarioPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("journal_entries")
       .select("*")
       .order("entry_date", { ascending: false })
       .order("created_at", { ascending: false });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+      setLoading(false);
+      return;
+    }
 
     const lista = (data as JournalEntry[]) ?? [];
     setEntries(lista);
@@ -48,6 +55,7 @@ export default function DiarioPage() {
     }
 
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   useEffect(() => {
@@ -59,9 +67,13 @@ export default function DiarioPage() {
     if (!conteudo.trim()) return;
     setSalvando(true);
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData, error: erroUsuario } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (erroUsuario || !userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvando(false);
+      return;
+    }
 
     const { error } = entradaHojeId
       ? await supabase
