@@ -31,21 +31,18 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-base text-ink">
       {/* Header */}
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-3">
-          <Image
-            src="/logo-mark.png"
-            alt="ASCEN"
-            width={96}
-            height={96}
-            priority
-            className="h-12 w-12 object-contain"
-          />
-          <span className="font-display text-xl font-bold tracking-tight">ASCEN</span>
-        </div>
+      <header className="relative mx-auto flex max-w-5xl items-center justify-center px-6 py-6">
+        <Image
+          src="/logo-mark.png"
+          alt="ASCEN"
+          width={96}
+          height={96}
+          priority
+          className="h-14 w-14 object-contain"
+        />
         <Link
           href="/login"
-          className="text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+          className="absolute right-6 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
         >
           Entrar
         </Link>
@@ -53,9 +50,6 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-3xl px-6 pb-16 pt-10 text-center sm:pt-16">
-        <p className="mb-5 text-xs font-medium uppercase tracking-[0.2em] text-ink-faint">
-          by JB Group
-        </p>
         <h1 className="font-display text-4xl font-bold leading-[1.1] sm:text-5xl">
           Hábitos, metas e rotina.
           <br />
@@ -136,8 +130,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-base-border px-6 py-8 text-center text-xs text-ink-faint">
-        ASCEN — by JB Group
+      <footer className="border-t border-base-border px-6 py-10 text-center">
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-ink-faint">
+          desenvolvido por
+        </p>
+        <Image
+          src="/jb-group-logo.png"
+          alt="JB Group"
+          width={210}
+          height={140}
+          className="mx-auto h-10 w-auto object-contain"
+        />
       </footer>
     </main>
   );
