@@ -10,6 +10,9 @@ import {
   extrairQuantidade,
 } from "@/lib/alimentos";
 import { MULTIPLICADORES, LABEL_ATIVIDADE, calcularTMB, calcularKcal } from "@/lib/nutricao";
+import { useToast } from "@/components/ToastProvider";
+
+const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
 function hojeISO(): string {
   const d = new Date();
@@ -31,6 +34,7 @@ const ITEM_FORM_VAZIO: ItemFormState = { name: "", gramas: "", protein: "", carb
 
 export default function DietaView() {
   const supabase = createClient();
+  const { mostrarToast } = useToast();
   const hoje = hojeISO();
 
   const [metrics, setMetrics] = useState<BodyMetrics | null>(null);
@@ -125,7 +129,7 @@ export default function DietaView() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    await supabase.from("body_metrics").upsert({
+    const { error } = await supabase.from("body_metrics").upsert({
       user_id: userId,
       weight_kg: Number(peso),
       height_cm: Number(altura),
@@ -134,6 +138,12 @@ export default function DietaView() {
       activity_level: atividade,
       updated_at: new Date().toISOString(),
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvandoPerfil(false);
+      return;
+    }
 
     setEditandoPerfil(false);
     setSalvandoPerfil(false);
@@ -148,11 +158,16 @@ export default function DietaView() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    await supabase.from("meals").insert({
+    const { error } = await supabase.from("meals").insert({
       user_id: userId,
       date: hoje,
       name: novaRefeicaoNome.trim(),
     });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
 
     setNovaRefeicaoNome("");
     setMostrarFormRefeicao(false);
@@ -160,7 +175,11 @@ export default function DietaView() {
   }
 
   async function excluirRefeicao(mealId: string) {
-    await supabase.from("meals").delete().eq("id", mealId);
+    const { error } = await supabase.from("meals").delete().eq("id", mealId);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
@@ -258,7 +277,7 @@ export default function DietaView() {
     const userId = userData.user?.id;
     if (!userId) return;
 
-    await supabase.from("meal_items").insert({
+    const { error } = await supabase.from("meal_items").insert({
       meal_id: mealId,
       user_id: userId,
       name: form.name.trim(),
@@ -267,6 +286,11 @@ export default function DietaView() {
       fat_g: Number(form.fat) || 0,
     });
 
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
+
     setItemForm((atual) => ({ ...atual, [mealId]: ITEM_FORM_VAZIO }));
     setAlimentoSelecionado((s) => ({ ...s, [mealId]: null }));
     setSugestoes((s) => ({ ...s, [mealId]: [] }));
@@ -274,7 +298,11 @@ export default function DietaView() {
   }
 
   async function excluirItem(itemId: string) {
-    await supabase.from("meal_items").delete().eq("id", itemId);
+    const { error } = await supabase.from("meal_items").delete().eq("id", itemId);
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     carregar();
   }
 
@@ -295,7 +323,7 @@ export default function DietaView() {
 
   async function salvarEdicaoItem() {
     if (!itemEditando || !itemEditando.name.trim()) return;
-    await supabase
+    const { error } = await supabase
       .from("meal_items")
       .update({
         name: itemEditando.name.trim(),
@@ -304,6 +332,11 @@ export default function DietaView() {
         fat_g: Number(itemEditando.fat) || 0,
       })
       .eq("id", itemEditando.id);
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      return;
+    }
     setItemEditando(null);
     carregar();
   }
