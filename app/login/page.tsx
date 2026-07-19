@@ -300,3 +300,4 @@ function traduzErro(msg: string): string {
   if (msg.includes("Password should be")) return "A senha precisa ter pelo menos 6 caracteres.";
   return msg;
 }
+
