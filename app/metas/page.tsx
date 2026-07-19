@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import SwipeRow from "@/components/SwipeRow";
@@ -1003,11 +1004,12 @@ export default function MetasPage() {
                   className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-base-border bg-base-surface text-left"
                 >
                   {goal.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={goal.image_url}
                       alt={goal.title}
-                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-base p-4">
