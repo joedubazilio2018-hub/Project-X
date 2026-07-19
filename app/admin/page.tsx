@@ -6,6 +6,7 @@ import AppShell from "@/components/AppShell";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
+const MSG_ERRO_CARREGAR = "Não deu pra carregar os códigos agora. Tenta de novo em instantes.";
 
 type InviteCode = {
   id: string;
@@ -54,12 +55,20 @@ export default function AdminPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("invite_codes")
       .select("*")
       .order("created_at", { ascending: false });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_CARREGAR);
+      setLoading(false);
+      return;
+    }
+
     setCodigos((data as InviteCode[]) ?? []);
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   useEffect(() => {
