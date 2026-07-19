@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase-browser";
 type StatusAcesso = "verificando" | "aprovado" | "pendente";
 
 const CHAVE_CACHE = "ascen_acesso_aprovado";
+const VALIDADE_CACHE_MS = 6 * 60 * 60 * 1000; // 6 horas — evita bater no banco a cada troca de página, mas revalida durante o dia
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -25,10 +26,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 
   useEffect(() => {
-    // Evita bater no banco a cada troca de página dentro da mesma sessão do navegador
-    if (typeof window !== "undefined" && sessionStorage.getItem(CHAVE_CACHE) === "true") {
-      setStatus("aprovado");
-      return;
+    // Evita bater no banco a cada troca de página, mas revalida periodicamente
+    // (pra não deixar o acesso "preso" como aprovado se o trial vencer ou a
+    // assinatura for cancelada com a aba ainda aberta)
+    if (typeof window !== "undefined") {
+      const cacheBruto = sessionStorage.getItem(CHAVE_CACHE);
+      if (cacheBruto) {
+        try {
+          const { aprovadoEm } = JSON.parse(cacheBruto) as { aprovadoEm: number };
+          if (Date.now() - aprovadoEm < VALIDADE_CACHE_MS) {
+            setStatus("aprovado");
+            return;
+          }
+        } catch {
+          // cache em formato antigo/corrompido — ignora e revalida
+        }
+      }
     }
 
     async function verificar() {
@@ -43,7 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const aprovado = data?.[0]?.aprovado === true;
 
       if (aprovado && typeof window !== "undefined") {
-        sessionStorage.setItem(CHAVE_CACHE, "true");
+        sessionStorage.setItem(CHAVE_CACHE, JSON.stringify({ aprovadoEm: Date.now() }));
       }
 
       setStatus(aprovado ? "aprovado" : "pendente");
@@ -77,12 +90,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <h1 className="font-display text-lg font-bold text-ink">
-            Acesso aguardando liberação
+            Acesso não liberado
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Sua conta ainda não foi liberada. Verifique se o código de convite
-            usado no cadastro é válido, ou entre em contato com o
-            administrador.
+            Seu período de teste pode ter terminado ou sua assinatura não
+            está ativa no momento. Se você acha que isso é um engano, entre
+            em contato com o suporte.
           </p>
           <button
             onClick={sair}
