@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import { useToast } from "@/components/ToastProvider";
+import BotaoNotificacao from "@/components/BotaoNotificacao";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
@@ -107,6 +108,16 @@ export default function PerfilPage() {
           </button>
         </form>
       )}
+
+      <section className="mt-8 max-w-sm rounded-xl border border-base-border bg-base-surface p-5">
+        <h2 className="text-sm font-semibold text-ink">Notificações</h2>
+        <p className="mt-1 mb-4 text-xs text-ink-muted">
+          Ative para receber lembretes de hábitos, treinos, tarefas, metas e
+          dieta neste dispositivo (celular ou PC). Ative em cada dispositivo
+          que quiser receber avisos.
+        </p>
+        <BotaoNotificacao />
+      </section>
     </AppShell>
   );
 }
