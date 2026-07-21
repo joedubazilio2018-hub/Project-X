@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
-import BotaoNotificacao from "@/components/BotaoNotificacao";
 import SwipeRow from "@/components/SwipeRow";
 import type { Habit, HabitLog, HabitCategory } from "@/types/database";
 import { CORES_CATEGORIA as CORES } from "@/lib/cores";
@@ -272,9 +271,6 @@ export default function HabitosPage() {
         <p className="mt-1 text-sm text-ink-muted">
           Marque o que você cumpriu hoje.
         </p>
-        <div className="mt-3">
-          <BotaoNotificacao />
-        </div>
       </header>
 
       {/* Categorias */}
