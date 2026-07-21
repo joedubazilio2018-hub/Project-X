@@ -11,6 +11,8 @@ import {
 } from "@/lib/alimentos";
 import { MULTIPLICADORES, LABEL_ATIVIDADE, calcularTMB, calcularKcal } from "@/lib/nutricao";
 import { useToast } from "@/components/ToastProvider";
+import AguaCard from "@/components/AguaCard";
+
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
 
@@ -362,8 +364,10 @@ export default function DietaView() {
     return <p className="text-sm text-ink-muted">Carregando...</p>;
   }
 
-  return (
+    return (
     <div className="flex flex-col gap-8">
+      <AguaCard />
+
       <section className="rounded-xl border border-base-border bg-base-surface p-4">
         {!metrics && !editandoPerfil ? (
           <div className="text-center">
