@@ -127,6 +127,20 @@ export type WorkoutSession = {
   workout_name: string;
   started_at: string;
   finished_at: string | null;
+  duration_seconds: number | null;
+};
+export type WorkoutSessionExercise = {
+  id: string;
+  session_id: string;
+  user_id: string;
+  exercise_id: string | null;
+  name: string;
+  sets: number;
+  reps: string;
+  load: string | null;
+  completed: boolean;
+  position: number;
+  created_at: string;
 };
 export type Sex = "m" | "f";
 export type ActivityLevel = "sedentario" | "leve" | "moderado" | "intenso" | "muito_intenso";
