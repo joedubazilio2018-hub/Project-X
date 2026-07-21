@@ -19,6 +19,18 @@ type ExercicioForm = {
   load: string;
 };
 
+// Exercício dentro de uma sessão em andamento: começa com os valores
+// padrão da rotina (sets/reps/load), mas o usuário pode ajustar durante
+// o treino — é isso que vira o registro real salvo no histórico.
+type SessaoExercicioState = {
+  exerciseId: string;
+  name: string;
+  sets: string;
+  reps: string;
+  load: string;
+  completed: boolean;
+};
+
 function novoExercicioVazio(): ExercicioForm {
   return { tempId: crypto.randomUUID(), name: "", sets: "3", reps: "8-12", load: "" };
 }
@@ -30,6 +42,16 @@ function formatarDataHora(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Formata segundos como MM:SS, ou H:MM:SS se passar de 1 hora.
+function formatarCronometro(totalSegundos: number): string {
+  const horas = Math.floor(totalSegundos / 3600);
+  const minutos = Math.floor((totalSegundos % 3600) / 60);
+  const segundos = totalSegundos % 60;
+  const mm = String(minutos).padStart(2, "0");
+  const ss = String(segundos).padStart(2, "0");
+  return horas > 0 ? `${horas}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
 export default function TreinosPage() {
@@ -60,10 +82,23 @@ function TreinosConteudo() {
 
   const [sessaoAtiva, setSessaoAtiva] = useState<{
     workout: Workout;
-    exercicios: WorkoutExercise[];
+    exercicios: SessaoExercicioState[];
     iniciadoEm: string;
-    concluidos: Set<string>;
   } | null>(null);
+  const [finalizando, setFinalizando] = useState(false);
+
+  // Cronômetro ao vivo: recalcula o tempo decorrido a cada segundo
+  // enquanto houver uma sessão ativa.
+  const [segundosDecorridos, setSegundosDecorridos] = useState(0);
+  useEffect(() => {
+    if (!sessaoAtiva) return;
+    const inicio = new Date(sessaoAtiva.iniciadoEm).getTime();
+    setSegundosDecorridos(Math.max(0, Math.floor((Date.now() - inicio) / 1000)));
+    const intervalo = setInterval(() => {
+      setSegundosDecorridos(Math.max(0, Math.floor((Date.now() - inicio) / 1000)));
+    }, 1000);
+    return () => clearInterval(intervalo);
+  }, [sessaoAtiva?.iniciadoEm]);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -285,45 +320,107 @@ function TreinosConteudo() {
     const exercicios = exerciciosPorTreino[workout.id] ?? [];
     setSessaoAtiva({
       workout,
-      exercicios,
+      exercicios: exercicios.map((ex) => ({
+        exerciseId: ex.id,
+        name: ex.name,
+        sets: String(ex.sets),
+        reps: ex.reps,
+        load: ex.load ?? "",
+        completed: false,
+      })),
       iniciadoEm: new Date().toISOString(),
-      concluidos: new Set(),
     });
   }
 
-  function alternarExercicioConcluido(exercicioId: string) {
+  function atualizarExercicioSessao(
+    exerciseId: string,
+    campo: "sets" | "reps" | "load",
+    valor: string
+  ) {
     setSessaoAtiva((atual) => {
       if (!atual) return atual;
-      const novo = new Set(atual.concluidos);
-      if (novo.has(exercicioId)) novo.delete(exercicioId);
-      else novo.add(exercicioId);
-      return { ...atual, concluidos: novo };
+      return {
+        ...atual,
+        exercicios: atual.exercicios.map((ex) =>
+          ex.exerciseId === exerciseId ? { ...ex, [campo]: valor } : ex
+        ),
+      };
+    });
+  }
+
+  function alternarExercicioConcluido(exerciseId: string) {
+    setSessaoAtiva((atual) => {
+      if (!atual) return atual;
+      return {
+        ...atual,
+        exercicios: atual.exercicios.map((ex) =>
+          ex.exerciseId === exerciseId ? { ...ex, completed: !ex.completed } : ex
+        ),
+      };
     });
   }
 
   async function finalizarTreino() {
     if (!sessaoAtiva) return;
+    setFinalizando(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) {
       mostrarToast(MSG_ERRO_PADRAO);
+      setFinalizando(false);
       return;
     }
 
-    const { error } = await supabase.from("workout_sessions").insert({
-      user_id: userId,
-      workout_id: sessaoAtiva.workout.id,
-      workout_name: sessaoAtiva.workout.name,
-      started_at: sessaoAtiva.iniciadoEm,
-      finished_at: new Date().toISOString(),
-    });
+    const finishedAt = new Date().toISOString();
+    const duracaoSegundos = Math.max(
+      0,
+      Math.floor((new Date(finishedAt).getTime() - new Date(sessaoAtiva.iniciadoEm).getTime()) / 1000)
+    );
 
-    if (error) {
+    const { data: sessaoSalva, error: erroSessao } = await supabase
+      .from("workout_sessions")
+      .insert({
+        user_id: userId,
+        workout_id: sessaoAtiva.workout.id,
+        workout_name: sessaoAtiva.workout.name,
+        started_at: sessaoAtiva.iniciadoEm,
+        finished_at: finishedAt,
+        duration_seconds: duracaoSegundos,
+      })
+      .select()
+      .single();
+
+    if (erroSessao || !sessaoSalva) {
       mostrarToast(MSG_ERRO_PADRAO);
+      setFinalizando(false);
       return;
     }
 
+    const { error: erroItens } = await supabase.from("workout_session_exercises").insert(
+      sessaoAtiva.exercicios.map((ex, i) => ({
+        session_id: sessaoSalva.id,
+        user_id: userId,
+        exercise_id: ex.exerciseId,
+        name: ex.name,
+        sets: Number(ex.sets) || 1,
+        reps: ex.reps.trim() || "8-12",
+        load: ex.load.trim() || null,
+        completed: ex.completed,
+        position: i,
+      }))
+    );
+
+    if (erroItens) {
+      // A sessão em si já foi salva — só o detalhe por exercício que falhou.
+      // Ainda assim avisamos, porque o histórico vai ficar incompleto.
+      mostrarToast(MSG_ERRO_PADRAO);
+      setFinalizando(false);
+      return;
+    }
+
+    mostrarToast("Treino salvo no histórico!", "sucesso");
     setSessaoAtiva(null);
+    setFinalizando(false);
     carregar();
   }
 
@@ -335,7 +432,7 @@ function TreinosConteudo() {
 
   if (sessaoAtiva) {
     const total = sessaoAtiva.exercicios.length;
-    const feitos = sessaoAtiva.concluidos.size;
+    const feitos = sessaoAtiva.exercicios.filter((ex) => ex.completed).length;
     return (
       <AppShell>
         <div className="mb-6">
@@ -345,10 +442,20 @@ function TreinosConteudo() {
           >
             ← Sair sem salvar
           </button>
-          <h1 className="font-display text-xl font-bold text-ink">{sessaoAtiva.workout.name}</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {feitos}/{total} exercícios concluídos
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-display text-xl font-bold text-ink">{sessaoAtiva.workout.name}</h1>
+              <p className="mt-1 text-sm text-ink-muted">
+                {feitos}/{total} exercícios concluídos
+              </p>
+            </div>
+            <div className="shrink-0 rounded-lg border border-base-border bg-base-surface px-3 py-1.5 text-center">
+              <p className="font-display text-lg font-bold tabular-nums text-accent">
+                {formatarCronometro(segundosDecorridos)}
+              </p>
+              <p className="text-[10px] text-ink-faint">tempo</p>
+            </div>
+          </div>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-base-border">
             <div
               className="h-full bg-accent transition-all"
@@ -359,32 +466,50 @@ function TreinosConteudo() {
 
         <ul className="flex flex-col gap-2">
           {sessaoAtiva.exercicios.map((ex) => {
-            const concluido = sessaoAtiva.concluidos.has(ex.id);
             return (
               <li
-                key={ex.id}
-                className="flex items-center justify-between rounded-xl border border-base-border bg-base-surface px-4 py-3.5"
+                key={ex.exerciseId}
+                className={`rounded-xl border px-4 py-3.5 transition-colors ${
+                  ex.completed ? "border-accent/40 bg-accent-dim/30" : "border-base-border bg-base-surface"
+                }`}
               >
-                <div>
-                  <p className={`text-sm font-medium ${concluido ? "text-ink-muted line-through" : "text-ink"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <p className={`text-sm font-medium ${ex.completed ? "text-ink-muted line-through" : "text-ink"}`}>
                     {ex.name}
                   </p>
-                  <p className="mt-0.5 text-xs text-ink-faint">
-                    {ex.sets}x {ex.reps}
-                    {ex.load ? ` · ${ex.load}` : ""}
-                  </p>
+                  <button
+                    onClick={() => alternarExercicioConcluido(ex.exerciseId)}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                      ex.completed
+                        ? "border-accent bg-accent text-base"
+                        : "border-base-border text-ink-faint hover:border-accent hover:text-accent"
+                    }`}
+                    aria-label="Marcar exercício"
+                  >
+                    {ex.completed ? "✓" : ""}
+                  </button>
                 </div>
-                <button
-                  onClick={() => alternarExercicioConcluido(ex.id)}
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                    concluido
-                      ? "border-accent bg-accent text-base"
-                      : "border-base-border text-ink-faint hover:border-accent hover:text-accent"
-                  }`}
-                  aria-label="Marcar exercício"
-                >
-                  {concluido ? "✓" : ""}
-                </button>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    value={ex.sets}
+                    onChange={(e) => atualizarExercicioSessao(ex.exerciseId, "sets", e.target.value)}
+                    placeholder="Séries"
+                    inputMode="numeric"
+                    className="w-16 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-sm text-ink outline-none focus:border-accent"
+                  />
+                  <input
+                    value={ex.reps}
+                    onChange={(e) => atualizarExercicioSessao(ex.exerciseId, "reps", e.target.value)}
+                    placeholder="Reps"
+                    className="w-20 rounded-md border border-base-border bg-base px-2 py-1.5 text-center text-sm text-ink outline-none focus:border-accent"
+                  />
+                  <input
+                    value={ex.load}
+                    onChange={(e) => atualizarExercicioSessao(ex.exerciseId, "load", e.target.value)}
+                    placeholder="Carga usada"
+                    className="w-32 flex-1 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
+                  />
+                </div>
               </li>
             );
           })}
@@ -392,9 +517,10 @@ function TreinosConteudo() {
 
         <button
           onClick={finalizarTreino}
-          className="mt-6 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-base transition-opacity hover:opacity-90"
+          disabled={finalizando}
+          className="mt-6 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          Finalizar treino
+          {finalizando ? "Salvando..." : "Finalizar treino"}
         </button>
       </AppShell>
     );
