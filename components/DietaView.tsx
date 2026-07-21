@@ -368,10 +368,8 @@ export default function DietaView() {
     return (
     <div className="flex flex-col gap-8">
       <AguaCard />
-           <AguaCard />
       <PesoCard />
-
-      <section className="rounded-xl border border-base-border bg-base-surface p-4">
+      
       <section className="rounded-xl border border-base-border bg-base-surface p-4">
         {!metrics && !editandoPerfil ? (
           <div className="text-center">
