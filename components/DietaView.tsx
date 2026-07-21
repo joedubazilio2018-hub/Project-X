@@ -10,6 +10,16 @@ import {
   extrairQuantidade,
 } from "@/lib/alimentos";
 import { MULTIPLICADORES, LABEL_ATIVIDADE, calcularTMB, calcularKcal } from "@/lib/nutricao";
+import {
+  type AlimentoPersonalizado,
+  type ItemHistorico,
+  listarAlimentosPersonalizados,
+  buscarAlimentosPersonalizados,
+  criarAlimentoPersonalizado,
+  buscarHistoricoAlimentar,
+  derivarRecentes,
+  derivarFrequentes,
+} from "@/lib/alimentosPersonalizados";
 import { useToast } from "@/components/ToastProvider";
 import AguaCard from "@/components/AguaCard";
 import PesoCard from "@/components/PesoCard";
@@ -62,6 +72,15 @@ export default function DietaView() {
   const [sugestaoAberta, setSugestaoAberta] = useState<string | null>(null);
   const [alimentoSelecionado, setAlimentoSelecionado] = useState<Record<string, AlimentoBase | null>>({});
 
+  // Fase 4: alimentos personalizados + recentes/frequentes
+  const [personalizados, setPersonalizados] = useState<AlimentoPersonalizado[]>([]);
+  const [recentes, setRecentes] = useState<ItemHistorico[]>([]);
+  const [frequentes, setFrequentes] = useState<ItemHistorico[]>([]);
+  const [abaPorRefeicao, setAbaPorRefeicao] = useState<Record<string, "recentes" | "frequentes" | "meus">>({});
+  const [mostrarNovoAlimento, setMostrarNovoAlimento] = useState(false);
+  const [novoAlimento, setNovoAlimento] = useState({ nome: "", protein: "", carb: "", fat: "" });
+  const [salvandoAlimento, setSalvandoAlimento] = useState(false);
+
   const [itemEditando, setItemEditando] = useState<{
     id: string;
     mealId: string;
@@ -106,6 +125,15 @@ export default function DietaView() {
     setMetrics((metricsData as BodyMetrics) ?? null);
     setMeals((mealsData as Meal[]) ?? []);
     setItemsPorRefeicao(mapa);
+
+    const [listaPersonalizados, historico] = await Promise.all([
+      listarAlimentosPersonalizados(supabase, userId),
+      buscarHistoricoAlimentar(supabase, userId),
+    ]);
+    setPersonalizados(listaPersonalizados);
+    setRecentes(derivarRecentes(historico));
+    setFrequentes(derivarFrequentes(historico));
+
     setLoading(false);
   }, [supabase, hoje]);
 
@@ -196,7 +224,9 @@ export default function DietaView() {
   function lidarComNome(mealId: string, valor: string) {
     const formAtual = itemForm[mealId] ?? ITEM_FORM_VAZIO;
     const { termo, gramas: gramasDoTexto } = extrairQuantidade(valor);
-    const resultados = termo.length >= 2 ? buscarAlimentos(termo) : [];
+    const resultadosPersonalizados = termo.length >= 2 ? buscarAlimentosPersonalizados(personalizados, termo) : [];
+    const resultadosBase = termo.length >= 2 ? buscarAlimentos(termo) : [];
+    const resultados = [...resultadosPersonalizados, ...resultadosBase];
 
     setSugestoes((s) => ({ ...s, [mealId]: resultados }));
     setSugestaoAberta(resultados.length > 0 ? mealId : null);
@@ -243,6 +273,62 @@ export default function DietaView() {
     setAlimentoSelecionado((s) => ({ ...s, [mealId]: alimento }));
     setSugestoes((s) => ({ ...s, [mealId]: [] }));
     setSugestaoAberta(null);
+  }
+
+  // Recentes/frequentes vêm do histórico de meal_items, que guarda a
+  // quantidade absoluta usada da última vez (não tem "por 100g"), então aqui
+  // só preenchemos nome + macros direto, sem passar pelo cálculo de gramas.
+  function selecionarRecente(mealId: string, item: ItemHistorico) {
+    setAlimentoSelecionado((s) => ({ ...s, [mealId]: null }));
+    setItemForm((atual) => ({
+      ...atual,
+      [mealId]: {
+        name: item.name,
+        gramas: "",
+        protein: String(item.protein_g),
+        carb: String(item.carb_g),
+        fat: String(item.fat_g),
+      },
+    }));
+    setSugestoes((s) => ({ ...s, [mealId]: [] }));
+    setSugestaoAberta(null);
+  }
+
+  function trocarAba(mealId: string, aba: "recentes" | "frequentes" | "meus") {
+    setAbaPorRefeicao((atual) => ({ ...atual, [mealId]: aba }));
+  }
+
+  async function salvarNovoAlimento(e: React.FormEvent) {
+    e.preventDefault();
+    if (!novoAlimento.nome.trim()) return;
+    setSalvandoAlimento(true);
+
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    const protein_g = Number(novoAlimento.protein) || 0;
+    const carb_g = Number(novoAlimento.carb) || 0;
+    const fat_g = Number(novoAlimento.fat) || 0;
+
+    const { error } = await criarAlimentoPersonalizado(supabase, userId, {
+      nome: novoAlimento.nome.trim(),
+      kcal: calcularKcal(protein_g, carb_g, fat_g),
+      protein_g,
+      carb_g,
+      fat_g,
+    });
+
+    if (error) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvandoAlimento(false);
+      return;
+    }
+
+    setNovoAlimento({ nome: "", protein: "", carb: "", fat: "" });
+    setMostrarNovoAlimento(false);
+    setSalvandoAlimento(false);
+    carregar();
   }
 
   function atualizarGramas(mealId: string, valor: string) {
@@ -632,7 +718,7 @@ export default function DietaView() {
                       <input
                         value={form.name}
                         onChange={(e) => lidarComNome(meal.id, e.target.value)}
-                        onFocus={() => listaSugestoes.length > 0 && setSugestaoAberta(meal.id)}
+                        onFocus={() => setSugestaoAberta(meal.id)}
                         onBlur={() =>
                           setTimeout(
                             () => setSugestaoAberta((atual) => (atual === meal.id ? null : atual)),
@@ -643,7 +729,131 @@ export default function DietaView() {
                         className="w-full rounded-md border border-base-border bg-base px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
                         autoComplete="off"
                       />
-                      {sugestaoAberta === meal.id && listaSugestoes.length > 0 && (
+
+                      {sugestaoAberta === meal.id && form.name.trim() === "" && (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-base-border bg-base-surface shadow-lg">
+                          <div className="flex border-b border-base-border">
+                            {(["recentes", "frequentes", "meus"] as const).map((aba) => (
+                              <button
+                                key={aba}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => trocarAba(meal.id, aba)}
+                                className={`flex-1 py-1.5 text-[11px] font-semibold ${
+                                  (abaPorRefeicao[meal.id] ?? "recentes") === aba
+                                    ? "bg-accent text-base"
+                                    : "text-ink-faint hover:text-ink"
+                                }`}
+                              >
+                                {aba === "recentes" ? "Recentes" : aba === "frequentes" ? "Frequentes" : "Meus alimentos"}
+                              </button>
+                            ))}
+                          </div>
+
+                          {(abaPorRefeicao[meal.id] ?? "recentes") === "meus" ? (
+                            <>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => setMostrarNovoAlimento((v) => !v)}
+                                className="w-full border-b border-base-border px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:opacity-80"
+                              >
+                                {mostrarNovoAlimento ? "Cancelar" : "+ Criar alimento"}
+                              </button>
+                              {mostrarNovoAlimento && (
+                                <form
+                                  onSubmit={salvarNovoAlimento}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  className="flex flex-col gap-1.5 border-b border-base-border p-2"
+                                >
+                                  <input
+                                    value={novoAlimento.nome}
+                                    onChange={(e) => setNovoAlimento((a) => ({ ...a, nome: e.target.value }))}
+                                    placeholder="Nome do alimento"
+                                    className="rounded-md border border-base-border bg-base px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                                    required
+                                  />
+                                  <p className="text-[10px] text-ink-faint">Valores por 100g</p>
+                                  <div className="flex gap-1.5">
+                                    <input
+                                      value={novoAlimento.protein}
+                                      onChange={(e) => setNovoAlimento((a) => ({ ...a, protein: e.target.value }))}
+                                      placeholder="Prot(g)"
+                                      inputMode="decimal"
+                                      className="w-16 rounded-md border border-base-border bg-base px-2 py-1 text-center text-xs text-ink outline-none focus:border-accent"
+                                    />
+                                    <input
+                                      value={novoAlimento.carb}
+                                      onChange={(e) => setNovoAlimento((a) => ({ ...a, carb: e.target.value }))}
+                                      placeholder="Carb(g)"
+                                      inputMode="decimal"
+                                      className="w-16 rounded-md border border-base-border bg-base px-2 py-1 text-center text-xs text-ink outline-none focus:border-accent"
+                                    />
+                                    <input
+                                      value={novoAlimento.fat}
+                                      onChange={(e) => setNovoAlimento((a) => ({ ...a, fat: e.target.value }))}
+                                      placeholder="Gord(g)"
+                                      inputMode="decimal"
+                                      className="w-16 rounded-md border border-base-border bg-base px-2 py-1 text-center text-xs text-ink outline-none focus:border-accent"
+                                    />
+                                    <button
+                                      type="submit"
+                                      disabled={salvandoAlimento}
+                                      className="flex-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-base disabled:opacity-50"
+                                    >
+                                      Salvar
+                                    </button>
+                                  </div>
+                                </form>
+                              )}
+                              {personalizados.length === 0 ? (
+                                <p className="px-2.5 py-2 text-center text-[11px] text-ink-faint">
+                                  Nenhum alimento personalizado ainda.
+                                </p>
+                              ) : (
+                                personalizados.map((alimento) => (
+                                  <button
+                                    key={alimento.id}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => selecionarSugestao(meal.id, alimento)}
+                                    className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-ink hover:bg-base"
+                                  >
+                                    <span>{alimento.nome}</span>
+                                    <span className="text-ink-faint">{alimento.kcal} kcal/100g</span>
+                                  </button>
+                                ))
+                              )}
+                            </>
+                          ) : (
+                            (() => {
+                              const listaAba = (abaPorRefeicao[meal.id] ?? "recentes") === "recentes" ? recentes : frequentes;
+                              return listaAba.length === 0 ? (
+                                <p className="px-2.5 py-2 text-center text-[11px] text-ink-faint">
+                                  Nada por aqui ainda. Vai aparecer conforme você registra refeições.
+                                </p>
+                              ) : (
+                                listaAba.map((item) => (
+                                  <button
+                                    key={item.name}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => selecionarRecente(meal.id, item)}
+                                    className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-ink hover:bg-base"
+                                  >
+                                    <span>{item.name}</span>
+                                    <span className="text-ink-faint">
+                                      {Math.round(calcularKcal(item.protein_g, item.carb_g, item.fat_g))} kcal
+                                    </span>
+                                  </button>
+                                ))
+                              );
+                            })()
+                          )}
+                        </div>
+                      )}
+
+                      {sugestaoAberta === meal.id && form.name.trim() !== "" && listaSugestoes.length > 0 && (
                         <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-base-border bg-base-surface shadow-lg">
                           {listaSugestoes.map((alimento) => (
                             <button
