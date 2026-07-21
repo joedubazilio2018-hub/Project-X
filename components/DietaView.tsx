@@ -111,10 +111,15 @@ export default function DietaView() {
       .eq("date", hoje)
       .order("created_at", { ascending: true });
 
-    const { data: itemsData } = await supabase
-      .from("meal_items")
-      .select("*")
-      .order("created_at", { ascending: true });
+    const idsRefeicoesHoje = (mealsData as Meal[] | null)?.map((m) => m.id) ?? [];
+
+    const { data: itemsData } = idsRefeicoesHoje.length
+      ? await supabase
+          .from("meal_items")
+          .select("*")
+          .in("meal_id", idsRefeicoesHoje)
+          .order("created_at", { ascending: true })
+      : { data: [] as MealItem[] };
 
     const mapa: Record<string, MealItem[]> = {};
     (itemsData as MealItem[] | null)?.forEach((item) => {
