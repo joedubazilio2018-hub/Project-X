@@ -167,3 +167,13 @@ export type Note = {
   created_at: string;
   updated_at: string;
 };
+export type WaterLog = {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  ml: number;
+  goal_ml: number;
+  created_at: string;
+  updated_at: string;
+};
+
