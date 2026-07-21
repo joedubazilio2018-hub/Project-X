@@ -14,6 +14,8 @@ export default function BotaoNotificacao() {
   const supabase = createClient();
   const [suporte, setSuporte] = useState(false);
   const [status, setStatus] = useState<"inativo" | "ativo" | "negado" | "carregando">("carregando");
+  const [enviandoTeste, setEnviandoTeste] = useState(false);
+  const [mensagemTeste, setMensagemTeste] = useState<string | null>(null);
 
   useEffect(() => {
     // Checa se o navegador tem suporte a service worker + push + notification
@@ -104,6 +106,24 @@ export default function BotaoNotificacao() {
     }
   }
 
+  async function enviarTeste() {
+    setEnviandoTeste(true);
+    setMensagemTeste(null);
+    try {
+      const resposta = await fetch("/api/notificacoes/teste", { method: "POST" });
+      const dados = await resposta.json();
+      if (!resposta.ok) {
+        setMensagemTeste(dados.erro || "Não foi possível enviar agora.");
+        return;
+      }
+      setMensagemTeste("Notificação enviada! Confira seu dispositivo.");
+    } catch {
+      setMensagemTeste("Não foi possível enviar agora.");
+    } finally {
+      setEnviandoTeste(false);
+    }
+  }
+
   // Não mostra nada se o navegador não tiver suporte
   if (!suporte) return null;
 
@@ -121,17 +141,29 @@ export default function BotaoNotificacao() {
 
   if (status === "ativo") {
     return (
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5 text-xs text-accent">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-          Lembretes ativados
-        </span>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            Notificações ativadas neste dispositivo
+          </span>
+          <button
+            onClick={desativar}
+            className="text-xs text-ink-faint underline hover:text-warn"
+          >
+            Desativar
+          </button>
+        </div>
         <button
-          onClick={desativar}
-          className="text-xs text-ink-faint underline hover:text-warn"
+          onClick={enviarTeste}
+          disabled={enviandoTeste}
+          className="w-fit text-xs text-ink-faint underline hover:text-accent disabled:opacity-50"
         >
-          Desativar
+          {enviandoTeste ? "Enviando..." : "Enviar notificação de teste"}
         </button>
+        {mensagemTeste && (
+          <p className="text-xs text-ink-faint">{mensagemTeste}</p>
+        )}
       </div>
     );
   }
