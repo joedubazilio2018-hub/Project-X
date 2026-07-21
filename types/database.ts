@@ -137,6 +137,7 @@ export type BodyMetrics = {
   age: number;
   sex: Sex;
   activity_level: ActivityLevel;
+  calorie_goal: number | null; // meta calórica definida pelo usuário; se null, usa o TDEE calculado
   updated_at: string;
 };
 export type Meal = {
