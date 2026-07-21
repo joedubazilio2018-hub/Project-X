@@ -176,4 +176,11 @@ export type WaterLog = {
   created_at: string;
   updated_at: string;
 };
+export type WeightLog = {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  weight_kg: number;
+  created_at: string;
+};
 
