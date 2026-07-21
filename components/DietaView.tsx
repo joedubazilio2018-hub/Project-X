@@ -51,6 +51,7 @@ export default function DietaView() {
   const [idade, setIdade] = useState("");
   const [sexo, setSexo] = useState<Sex>("m");
   const [atividade, setAtividade] = useState<ActivityLevel>("moderado");
+  const [metaManual, setMetaManual] = useState("");
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
 
   const [novaRefeicaoNome, setNovaRefeicaoNome] = useState("");
@@ -119,6 +120,7 @@ export default function DietaView() {
       setIdade(String(metrics.age));
       setSexo(metrics.sex);
       setAtividade(metrics.activity_level);
+      setMetaManual(metrics.calorie_goal !== null ? String(metrics.calorie_goal) : "");
     }
     setEditandoPerfil(true);
   }
@@ -139,6 +141,7 @@ export default function DietaView() {
       age: Number(idade),
       sex: sexo,
       activity_level: atividade,
+      calorie_goal: metaManual.trim() ? Math.round(Number(metaManual)) : null,
       updated_at: new Date().toISOString(),
     });
 
@@ -359,7 +362,11 @@ export default function DietaView() {
     return { protein, carb, fat, kcal: calcularKcal(protein, carb, fat) };
   }, [itemsPorRefeicao]);
 
-  const deficit = tdee !== null ? Math.round(totaisDia.kcal - tdee) : null;
+  // Meta calórica: usa o valor definido manualmente pelo usuário; se ele não
+  // definiu, cai automaticamente pro TDEE calculado via Mifflin-St Jeor.
+  const metaCalorica =
+    metrics?.calorie_goal ?? (tdee !== null ? Math.round(tdee) : null);
+  const restante = metaCalorica !== null ? Math.round(metaCalorica - totaisDia.kcal) : null;
 
   if (loading) {
     return <p className="text-sm text-ink-muted">Carregando...</p>;
@@ -430,6 +437,18 @@ export default function DietaView() {
                 </option>
               ))}
             </select>
+            <div>
+              <input
+                value={metaManual}
+                onChange={(e) => setMetaManual(e.target.value)}
+                placeholder="Meta calórica (opcional)"
+                inputMode="numeric"
+                className="w-full rounded-lg border border-base-border bg-base px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+              <p className="mt-1 text-xs text-ink-faint">
+                Deixe em branco pra usar o TDEE calculado automaticamente como meta.
+              </p>
+            </div>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -452,9 +471,13 @@ export default function DietaView() {
         ) : (
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-ink-faint">Seu gasto calórico estimado (TDEE)</p>
-              <p className="font-display text-2xl font-bold text-ink">{Math.round(tdee ?? 0)} kcal/dia</p>
-              <p className="mt-0.5 text-xs text-ink-faint">TMB: {Math.round(tmb ?? 0)} kcal · {metrics ? LABEL_ATIVIDADE[metrics.activity_level] : ""}</p>
+              <p className="text-xs text-ink-faint">Sua meta calórica diária</p>
+              <p className="font-display text-2xl font-bold text-ink">{Math.round(metaCalorica ?? 0)} kcal/dia</p>
+              <p className="mt-0.5 text-xs text-ink-faint">
+                {metrics?.calorie_goal != null
+                  ? `Definida manualmente · TDEE calculado: ${Math.round(tdee ?? 0)} kcal`
+                  : `TMB: ${Math.round(tmb ?? 0)} kcal · ${metrics ? LABEL_ATIVIDADE[metrics.activity_level] : ""} (TDEE usado como meta)`}
+              </p>
             </div>
             <button onClick={abrirEdicaoPerfil} className="text-sm font-medium text-accent hover:opacity-80">
               Editar
@@ -704,18 +727,37 @@ export default function DietaView() {
             </div>
           </div>
 
-          {deficit !== null && (
-            <div
-              className={`mt-3 rounded-lg px-3 py-2 text-center text-sm font-semibold ${
-                deficit <= 0 ? "bg-accent-dim text-accent" : "bg-warn-dim text-warn"
-              }`}
-            >
-              {deficit <= 0 ? "Déficit calórico" : "Superávit calórico"}: {deficit > 0 ? "+" : ""}
-              {deficit} kcal
+          {metaCalorica !== null && (
+            <div className="mt-3 grid grid-cols-3 items-center rounded-lg bg-base px-2 py-3 text-center">
+              <div>
+                <p className="font-display text-lg font-bold text-ink">{Math.round(metaCalorica)}</p>
+                <p className="text-[10px] text-ink-faint">Meta</p>
+              </div>
+              <div className="text-ink-faint">
+                <p className="font-display text-lg font-bold">−</p>
+              </div>
+              <div>
+                <p className="font-display text-lg font-bold text-ink">{Math.round(totaisDia.kcal)}</p>
+                <p className="text-[10px] text-ink-faint">Consumido</p>
+              </div>
+              <div className="col-span-3 mt-2 border-t border-base-border pt-2">
+                <p
+                  className={`font-display text-2xl font-bold ${
+                    restante !== null && restante < 0 ? "text-warn" : "text-accent"
+                  }`}
+                >
+                  {restante} kcal
+                </p>
+                <p className="text-[10px] text-ink-faint">
+                  {restante !== null && restante < 0 ? "Acima da meta" : "Restante"}
+                </p>
+              </div>
             </div>
           )}
           <p className="mt-1.5 text-center text-[10px] text-ink-faint">
-            Estimativa baseada em macros e no seu gasto total (TDEE).
+            {metrics?.calorie_goal != null
+              ? "Meta definida manualmente."
+              : "Meta baseada no seu gasto total estimado (TDEE)."}
           </p>
         </section>
       )}
