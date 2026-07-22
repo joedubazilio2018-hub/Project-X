@@ -630,21 +630,21 @@ export default function DashboardPage() {
               </p>
             ) : (
               <>
-                <div className="mb-4 grid grid-cols-3 gap-3">
-                  <div>
-                    <p className="font-display text-xl font-bold text-gold">
+                <div className="mb-4 grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-base px-2 py-2.5 text-center">
+                    <p className="font-display text-xl font-bold tabular-nums text-gold">
                       {metasEmAndamento}
                     </p>
                     <p className="text-xs text-ink-muted">Em andamento</p>
                   </div>
-                  <div>
-                    <p className="font-display text-xl font-bold text-accent">
+                  <div className="rounded-lg bg-base px-2 py-2.5 text-center">
+                    <p className="font-display text-xl font-bold tabular-nums text-accent">
                       {metasConcluidas}
                     </p>
                     <p className="text-xs text-ink-muted">Concluídas</p>
                   </div>
-                  <div>
-                    <p className="font-display text-xl font-bold text-ink-faint">
+                  <div className="rounded-lg bg-base px-2 py-2.5 text-center">
+                    <p className="font-display text-xl font-bold tabular-nums text-ink-faint">
                       {metasNaoIniciadas}
                     </p>
                     <p className="text-xs text-ink-muted">Não iniciadas</p>
@@ -683,16 +683,16 @@ export default function DashboardPage() {
                 Você ainda não tem tarefas cadastradas.
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className="font-display text-xl font-bold text-ink">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg bg-base px-2 py-2.5 text-center">
+                  <p className="font-display text-xl font-bold tabular-nums text-ink">
                     {tarefasHojePendentes}
                   </p>
                   <p className="text-xs text-ink-muted">Para hoje</p>
                 </div>
-                <div>
+                <div className="rounded-lg bg-base px-2 py-2.5 text-center">
                   <p
-                    className={`font-display text-xl font-bold ${
+                    className={`font-display text-xl font-bold tabular-nums ${
                       tarefasVencidas > 0 ? "text-warn" : "text-ink-faint"
                     }`}
                   >
@@ -700,8 +700,8 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-xs text-ink-muted">Vencidas</p>
                 </div>
-                <div>
-                  <p className="font-display text-xl font-bold text-accent">
+                <div className="rounded-lg bg-base px-2 py-2.5 text-center">
+                  <p className="font-display text-xl font-bold tabular-nums text-accent">
                     {tarefasConcluidasHoje}
                   </p>
                   <p className="text-xs text-ink-muted">Concluídas hoje</p>
@@ -727,18 +727,18 @@ export default function DashboardPage() {
                 Você ainda não tem rotinas de treino cadastradas.
               </p>
             ) : (
-              <div className="flex items-center gap-6">
-                <div>
-                  <p className="font-display text-xl font-bold text-ink">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-base px-3 py-2.5 text-center">
+                  <p className="font-display text-xl font-bold tabular-nums text-ink">
                     {treinosSemana}
                   </p>
                   <p className="text-xs text-ink-muted">
-                    {treinosSemana === 1 ? "treino" : "treinos"} (últimos 7 dias)
+                    {treinosSemana === 1 ? "treino" : "treinos"} (7 dias)
                   </p>
                 </div>
                 {ultimoTreino && (
-                  <div>
-                    <p className="text-sm font-medium text-ink">
+                  <div className="min-w-0 flex-1 rounded-lg bg-base px-3 py-2.5">
+                    <p className="truncate text-sm font-medium text-ink">
                       {ultimoTreino.workout_name}
                     </p>
                     <p className="text-xs text-ink-muted">
@@ -771,27 +771,27 @@ export default function DashboardPage() {
               </p>
             ) : (
               <>
-                <div className="mb-4 grid grid-cols-4 gap-2 text-center">
-                  <div>
-                    <p className="font-display text-lg font-bold text-accent">
+                <div className="mb-4 grid grid-cols-4 gap-2">
+                  <div className="rounded-lg bg-base px-1 py-2 text-center">
+                    <p className="font-display text-lg font-bold tabular-nums text-accent">
                       {Math.round(totaisDietaHoje.protein)}g
                     </p>
                     <p className="text-[10px] text-ink-muted">Proteína</p>
                   </div>
-                  <div>
-                    <p className="font-display text-lg font-bold text-ink">
+                  <div className="rounded-lg bg-base px-1 py-2 text-center">
+                    <p className="font-display text-lg font-bold tabular-nums text-ink">
                       {Math.round(totaisDietaHoje.carb)}g
                     </p>
                     <p className="text-[10px] text-ink-muted">Carbo</p>
                   </div>
-                  <div>
-                    <p className="font-display text-lg font-bold text-warn">
+                  <div className="rounded-lg bg-base px-1 py-2 text-center">
+                    <p className="font-display text-lg font-bold tabular-nums text-warn">
                       {Math.round(totaisDietaHoje.fat)}g
                     </p>
                     <p className="text-[10px] text-ink-muted">Gordura</p>
                   </div>
-                  <div>
-                    <p className="font-display text-lg font-bold text-ink">
+                  <div className="rounded-lg bg-base px-1 py-2 text-center">
+                    <p className="font-display text-lg font-bold tabular-nums text-ink">
                       {Math.round(kcalDietaHoje)}
                     </p>
                     <p className="text-[10px] text-ink-muted">kcal hoje</p>
