@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { frasedoDia } from "@/lib/frase-do-dia";
 import AppShell from "@/components/AppShell";
 import CompartilharFrase from "@/components/CompartilharFrase";
+import AguaCard from "@/components/AguaCard";
 import { useToast } from "@/components/ToastProvider";
 import { calcularTDEE, calcularKcal } from "@/lib/nutricao";
 import type {
@@ -814,6 +815,11 @@ export default function DashboardPage() {
               </>
             )}
           </section>
+
+          {/* Água */}
+          <div className="mb-6">
+            <AguaCard />
+          </div>
 
           {/* Resumo de Diário */}
           <section className="mb-6 rounded-xl border border-base-border bg-base-surface p-5">
