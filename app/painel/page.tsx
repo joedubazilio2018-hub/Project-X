@@ -579,20 +579,35 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
             <CardEstatistica
-              label="Hoje"
+              label="Saldo"
+              valor={formatarMoeda(saldoTotal)}
+              destaque={saldoTotal >= 0}
+            />
+            <CardEstatistica
+              label="Hábitos hoje"
               valor={totalHoje > 0 ? `${feitosHoje}/${totalHoje}` : "—"}
+              sublinha={
+                streak > 0
+                  ? `${streak} ${streak === 1 ? "dia" : "dias"} seguidos`
+                  : undefined
+              }
               destaque={totalHoje > 0 && feitosHoje === totalHoje}
             />
             <CardEstatistica
-              label="Sequência atual"
-              valor={`${streak} ${streak === 1 ? "dia" : "dias"}`}
-              destaque={streak >= 3}
+              label="Tarefas hoje"
+              valor={String(tarefasHojePendentes)}
+              sublinha={
+                tarefasVencidas > 0
+                  ? `${tarefasVencidas} ${tarefasVencidas === 1 ? "vencida" : "vencidas"}`
+                  : undefined
+              }
+              sublinhaAlerta={tarefasVencidas > 0}
             />
             <CardEstatistica
-              label="Hábitos ativos"
-              valor={String(habits.length)}
+              label="Treinos (7 dias)"
+              valor={String(treinosSemana)}
             />
           </div>
 
@@ -1077,10 +1092,14 @@ export default function DashboardPage() {
 function CardEstatistica({
   label,
   valor,
+  sublinha,
+  sublinhaAlerta,
   destaque,
 }: {
   label: string;
   valor: string;
+  sublinha?: string;
+  sublinhaAlerta?: boolean;
   destaque?: boolean;
 }) {
   return (
@@ -1093,6 +1112,15 @@ function CardEstatistica({
       >
         {valor}
       </p>
+      {sublinha && (
+        <p
+          className={`mt-0.5 text-xs ${
+            sublinhaAlerta ? "text-warn" : "text-ink-faint"
+          }`}
+        >
+          {sublinha}
+        </p>
+      )}
     </div>
   );
 }
