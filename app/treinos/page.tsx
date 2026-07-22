@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import AppShell from "@/components/AppShell";
 import DietaView from "@/components/DietaView";
-import type { Workout, WorkoutExercise, WorkoutSession } from "@/types/database";
+import type { Workout, WorkoutExercise, WorkoutSession, WorkoutSessionExercise } from "@/types/database";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
@@ -71,7 +71,13 @@ function TreinosConteudo() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exerciciosPorTreino, setExerciciosPorTreino] = useState<Record<string, WorkoutExercise[]>>({});
   const [sessoes, setSessoes] = useState<WorkoutSession[]>([]);
+  const [itensPorSessao, setItensPorSessao] = useState<Record<string, WorkoutSessionExercise[]>>({});
   const [loading, setLoading] = useState(true);
+
+  const [historicoAberto, setHistoricoAberto] = useState(false);
+  const [filtroRotina, setFiltroRotina] = useState<string>("todas");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"7" | "30" | "90" | "todos">("30");
+  const [sessaoExpandida, setSessaoExpandida] = useState<string | null>(null);
 
   const [formAberto, setFormAberto] = useState<"novo" | string | null>(null);
   const [nomeRotina, setNomeRotina] = useState("");
@@ -156,8 +162,18 @@ function TreinosConteudo() {
       .select("*")
       .not("finished_at", "is", null)
       .order("finished_at", { ascending: false })
-      .limit(10);
+      .limit(200);
     if (erroSessoes) houveErro = true;
+
+    const idsSessoes = (sessoesData as WorkoutSession[] | null)?.map((s) => s.id) ?? [];
+    const { data: itensSessaoData, error: erroItensSessao } = idsSessoes.length
+      ? await supabase
+          .from("workout_session_exercises")
+          .select("*")
+          .in("session_id", idsSessoes)
+          .order("position", { ascending: true })
+      : { data: [] as WorkoutSessionExercise[], error: null };
+    if (erroItensSessao) houveErro = true;
 
     const { data: catalogoData, error: erroCatalogo } = await supabase
       .from("exercise_catalog")
@@ -173,9 +189,16 @@ function TreinosConteudo() {
       mapa[ex.workout_id].push(ex);
     });
 
+    const mapaItensSessao: Record<string, WorkoutSessionExercise[]> = {};
+    (itensSessaoData as WorkoutSessionExercise[] | null)?.forEach((item) => {
+      if (!mapaItensSessao[item.session_id]) mapaItensSessao[item.session_id] = [];
+      mapaItensSessao[item.session_id].push(item);
+    });
+
     setWorkouts((workoutsData as Workout[]) ?? []);
     setExerciciosPorTreino(mapa);
     setSessoes((sessoesData as WorkoutSession[]) ?? []);
+    setItensPorSessao(mapaItensSessao);
     setLoading(false);
 
     if (houveErro) {
@@ -461,6 +484,32 @@ function TreinosConteudo() {
     return sessoes.filter((s) => s.finished_at && new Date(s.finished_at) >= seteDiasAtras).length;
   }, [sessoes]);
 
+  // Histórico completo: aplica o filtro de rotina e de período por cima
+  // das sessões já carregadas (nada de refazer a busca no banco).
+  // A "chave" da rotina usa o nome como fallback pra sessões antigas de
+  // rotinas que já foram excluídas (workout_id fica null nesse caso).
+  const rotinasNoHistorico = useMemo(() => {
+    const vistos = new Map<string, string>();
+    sessoes.forEach((s) => {
+      const chave = s.workout_id ?? s.workout_name;
+      if (!vistos.has(chave)) vistos.set(chave, s.workout_name);
+    });
+    return Array.from(vistos.entries()).map(([chave, nome]) => ({ chave, nome }));
+  }, [sessoes]);
+
+  const sessoesFiltradas = useMemo(() => {
+    let lista = sessoes;
+    if (filtroRotina !== "todas") {
+      lista = lista.filter((s) => (s.workout_id ?? s.workout_name) === filtroRotina);
+    }
+    if (filtroPeriodo !== "todos") {
+      const limite = new Date();
+      limite.setDate(limite.getDate() - Number(filtroPeriodo));
+      lista = lista.filter((s) => s.finished_at && new Date(s.finished_at) >= limite);
+    }
+    return lista;
+  }, [sessoes, filtroRotina, filtroPeriodo]);
+
   if (sessaoAtiva) {
     const total = sessaoAtiva.exercicios.length;
     const feitos = sessaoAtiva.exercicios.filter((ex) => ex.completed).length;
@@ -574,6 +623,104 @@ function TreinosConteudo() {
         >
           {finalizando ? "Salvando..." : "Finalizar treino"}
         </button>
+      </AppShell>
+    );
+  }
+
+  if (historicoAberto) {
+    return (
+      <AppShell>
+        <div className="mb-4">
+          <button
+            onClick={() => setHistoricoAberto(false)}
+            className="mb-3 text-sm text-ink-faint hover:text-ink"
+          >
+            ← Voltar
+          </button>
+          <h1 className="font-display text-xl font-bold text-ink">Histórico de treinos</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            {sessoesFiltradas.length} treino{sessoesFiltradas.length === 1 ? "" : "s"} no período
+          </p>
+        </div>
+
+        <div className="mb-5 flex flex-wrap gap-2">
+          <select
+            value={filtroRotina}
+            onChange={(e) => setFiltroRotina(e.target.value)}
+            className="rounded-lg border border-base-border bg-base-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+          >
+            <option value="todas">Todas as rotinas</option>
+            {rotinasNoHistorico.map((r) => (
+              <option key={r.chave} value={r.chave}>
+                {r.nome}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroPeriodo}
+            onChange={(e) => setFiltroPeriodo(e.target.value as typeof filtroPeriodo)}
+            className="rounded-lg border border-base-border bg-base-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+          >
+            <option value="7">Últimos 7 dias</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+            <option value="todos">Tudo</option>
+          </select>
+        </div>
+
+        {sessoesFiltradas.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-base-border p-6 text-center">
+            <p className="text-sm text-ink-muted">Nenhum treino encontrado nesse filtro.</p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {sessoesFiltradas.map((s) => {
+              const itens = itensPorSessao[s.id] ?? [];
+              const expandida = sessaoExpandida === s.id;
+              return (
+                <li key={s.id} className="overflow-hidden rounded-xl border border-base-border bg-base-surface">
+                  <button
+                    onClick={() => setSessaoExpandida(expandida ? null : s.id)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">{s.workout_name}</p>
+                      <p className="mt-0.5 text-xs text-ink-faint">
+                        {s.finished_at ? formatarDataHora(s.finished_at) : ""}
+                        {s.duration_seconds != null ? ` · ${formatarCronometro(s.duration_seconds)}` : ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-ink-faint">{expandida ? "▲" : "▼"}</span>
+                  </button>
+                  {expandida && (
+                    <div className="border-t border-base-border px-4 py-3">
+                      {itens.length === 0 ? (
+                        <p className="text-xs text-ink-faint">
+                          Sem detalhe de exercícios salvo pra essa sessão.
+                        </p>
+                      ) : (
+                        <ul className="flex flex-col gap-1.5">
+                          {itens.map((item) => (
+                            <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                              <span className={item.completed ? "text-ink" : "text-ink-muted"}>
+                                {item.completed ? "✓ " : ""}
+                                {item.name}
+                              </span>
+                              <span className="shrink-0 text-xs text-ink-faint">
+                                {item.sets}x {item.reps}
+                                {item.load ? ` · ${item.load}` : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </AppShell>
     );
   }
@@ -792,9 +939,17 @@ function TreinosConteudo() {
 
           {sessoes.length > 0 && (
             <section className="mt-8">
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                Últimos treinos
-              </h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                  Últimos treinos
+                </h2>
+                <button
+                  onClick={() => setHistoricoAberto(true)}
+                  className="text-xs font-medium text-accent hover:opacity-80"
+                >
+                  Ver histórico completo →
+                </button>
+              </div>
               <ul className="flex flex-col gap-1.5">
                 {sessoes.slice(0, 5).map((s) => (
                   <li
@@ -804,6 +959,7 @@ function TreinosConteudo() {
                     <span className="text-ink">{s.workout_name}</span>
                     <span className="text-xs text-ink-faint">
                       {s.finished_at ? formatarDataHora(s.finished_at) : ""}
+                      {s.duration_seconds != null ? ` · ${formatarCronometro(s.duration_seconds)}` : ""}
                     </span>
                   </li>
                 ))}
