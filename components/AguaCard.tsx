@@ -6,7 +6,8 @@ import type { WaterLog } from "@/types/database";
 import { useToast } from "@/components/ToastProvider";
 
 const MSG_ERRO_PADRAO = "Não deu pra salvar agora. Tenta de novo em instantes.";
-const TAMANHO_COPO_ML = 250;
+const COPO_PADRAO_ML = 250;
+const COPOS_SUGERIDOS = [200, 250, 300, 500, 700];
 const METAS_SUGERIDAS = [1500, 2000, 2500, 3000];
 
 function hojeISO(): string {
@@ -26,6 +27,9 @@ export default function AguaCard() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [editandoMeta, setEditandoMeta] = useState(false);
+  const [editandoCopo, setEditandoCopo] = useState(false);
+  const [tamanhoCopo, setTamanhoCopo] = useState(COPO_PADRAO_ML);
+  const [valorCustom, setValorCustom] = useState("");
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -92,16 +96,31 @@ export default function AguaCard() {
   }
 
   function adicionarCopo() {
-    salvar((log?.ml ?? 0) + TAMANHO_COPO_ML);
+    salvar((log?.ml ?? 0) + tamanhoCopo);
   }
 
   function removerCopo() {
-    salvar(Math.max(0, (log?.ml ?? 0) - TAMANHO_COPO_ML));
+    salvar(Math.max(0, (log?.ml ?? 0) - tamanhoCopo));
   }
 
   function escolherMeta(novaMeta: number) {
     salvar(log?.ml ?? 0, novaMeta);
     setEditandoMeta(false);
+  }
+
+  function escolherCopo(novoValor: number) {
+    if (novoValor > 0) {
+      setTamanhoCopo(novoValor);
+    }
+    setValorCustom("");
+    setEditandoCopo(false);
+  }
+
+  function confirmarValorCustom() {
+    const valor = parseInt(valorCustom, 10);
+    if (!isNaN(valor) && valor > 0) {
+      escolherCopo(valor);
+    }
   }
 
   if (loading) {
@@ -115,20 +134,73 @@ export default function AguaCard() {
   const mlAtual = log?.ml ?? 0;
   const meta = log?.goal_ml ?? 2000;
   const percentual = Math.min(100, Math.round((mlAtual / meta) * 100));
-  const coposAtuais = Math.round(mlAtual / TAMANHO_COPO_ML);
-  const coposMeta = Math.round(meta / TAMANHO_COPO_ML);
+  const coposAtuais = Math.round(mlAtual / tamanhoCopo);
+  const coposMeta = Math.round(meta / tamanhoCopo);
 
   return (
     <section className="rounded-xl border border-base-border bg-base-surface p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">💧 Água</h2>
-        <button
-          onClick={() => setEditandoMeta((v) => !v)}
-          className="text-xs font-medium text-accent hover:underline"
-        >
-          Meta: {meta}ml
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setEditandoCopo((v) => !v);
+              setEditandoMeta(false);
+            }}
+            className="text-xs font-medium text-accent hover:underline"
+          >
+            Copo: {tamanhoCopo}ml
+          </button>
+          <button
+            onClick={() => {
+              setEditandoMeta((v) => !v);
+              setEditandoCopo(false);
+            }}
+            className="text-xs font-medium text-accent hover:underline"
+          >
+            Meta: {meta}ml
+          </button>
+        </div>
       </div>
+
+      {editandoCopo && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {COPOS_SUGERIDOS.map((valor) => (
+            <button
+              key={valor}
+              onClick={() => escolherCopo(valor)}
+              className={`rounded-full border px-3 py-1 text-xs ${
+                valor === tamanhoCopo
+                  ? "border-accent bg-accent-dim text-accent"
+                  : "border-base-border text-ink-muted hover:border-accent"
+              }`}
+            >
+              {valor}ml
+            </button>
+          ))}
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              placeholder="Outro"
+              value={valorCustom}
+              onChange={(e) => setValorCustom(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmarValorCustom();
+              }}
+              className="w-20 rounded-full border border-base-border bg-base px-3 py-1 text-xs text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            />
+            <button
+              onClick={confirmarValorCustom}
+              disabled={!valorCustom}
+              className="rounded-full border border-base-border px-2.5 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       {editandoMeta && (
         <div className="mb-3 flex flex-wrap gap-2">
@@ -161,7 +233,7 @@ export default function AguaCard() {
             {mlAtual}ml <span className="text-sm font-normal text-ink-faint">/ {meta}ml</span>
           </p>
           <p className="text-xs text-ink-faint">
-            {coposAtuais} de {coposMeta} copos ({TAMANHO_COPO_ML}ml cada)
+            {coposAtuais} de {coposMeta} copos ({tamanhoCopo}ml cada)
           </p>
         </div>
 
