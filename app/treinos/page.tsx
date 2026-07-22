@@ -78,6 +78,9 @@ function TreinosConteudo() {
   const [filtroRotina, setFiltroRotina] = useState<string>("todas");
   const [filtroPeriodo, setFiltroPeriodo] = useState<"7" | "30" | "90" | "todos">("30");
   const [sessaoExpandida, setSessaoExpandida] = useState<string | null>(null);
+  const [sessaoParaSalvarComoRotina, setSessaoParaSalvarComoRotina] = useState<string | null>(null);
+  const [nomeNovaRotinaHistorico, setNomeNovaRotinaHistorico] = useState("");
+  const [salvandoNovaRotina, setSalvandoNovaRotina] = useState(false);
 
   const [formAberto, setFormAberto] = useState<"novo" | string | null>(null);
   const [nomeRotina, setNomeRotina] = useState("");
@@ -92,6 +95,7 @@ function TreinosConteudo() {
     iniciadoEm: string;
   } | null>(null);
   const [finalizando, setFinalizando] = useState(false);
+  const [atualizarRotinaAoFinalizar, setAtualizarRotinaAoFinalizar] = useState(false);
 
   // Cronômetro ao vivo, com suporte a pausa: enquanto pausado, o tempo
   // acumulado até ali fica congelado (não conta banheiro/descanso longo
@@ -131,6 +135,7 @@ function TreinosConteudo() {
     setPausado(false);
     setPausaIniciadaEm(null);
     setTotalPausadoMs(0);
+    setAtualizarRotinaAoFinalizar(false);
   }
 
   const carregar = useCallback(async () => {
@@ -366,6 +371,64 @@ function TreinosConteudo() {
     carregar();
   }
 
+  // Cria uma rotina nova a partir do que foi de fato feito em uma sessão
+  // do histórico — sem mexer na rotina original (se ainda existir).
+  async function criarRotinaAPartirDaSessao(sessionId: string) {
+    const nome = nomeNovaRotinaHistorico.trim();
+    if (!nome) return;
+    const itens = itensPorSessao[sessionId] ?? [];
+    if (itens.length === 0) {
+      mostrarToast("Essa sessão não tem exercícios salvos pra copiar.");
+      return;
+    }
+
+    setSalvandoNovaRotina(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvandoNovaRotina(false);
+      return;
+    }
+
+    const { data: novaRotina, error: erroRotina } = await supabase
+      .from("workouts")
+      .insert({ user_id: userId, name: nome, position: workouts.length })
+      .select()
+      .single();
+
+    if (erroRotina || !novaRotina) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvandoNovaRotina(false);
+      return;
+    }
+
+    const { error: erroExercicios } = await supabase.from("workout_exercises").insert(
+      itens.map((item, i) => ({
+        workout_id: novaRotina.id,
+        user_id: userId,
+        name: item.name,
+        sets: item.sets,
+        reps: item.reps,
+        load: item.load,
+        position: i,
+      }))
+    );
+
+    if (erroExercicios) {
+      mostrarToast(MSG_ERRO_PADRAO);
+      setSalvandoNovaRotina(false);
+      return;
+    }
+
+    mostrarToast("Rotina criada a partir do histórico!", "sucesso");
+    sincronizarCatalogo(itens.map((item) => item.name));
+    setSessaoParaSalvarComoRotina(null);
+    setNomeNovaRotinaHistorico("");
+    setSalvandoNovaRotina(false);
+    carregar();
+  }
+
   function iniciarTreino(workout: Workout) {
     const exercicios = exerciciosPorTreino[workout.id] ?? [];
     setSessaoAtiva({
@@ -384,6 +447,7 @@ function TreinosConteudo() {
     setPausado(false);
     setPausaIniciadaEm(null);
     setTotalPausadoMs(0);
+    setAtualizarRotinaAoFinalizar(false);
   }
 
   function atualizarExercicioSessao(
@@ -472,7 +536,30 @@ function TreinosConteudo() {
       return;
     }
 
-    mostrarToast("Treino salvo no histórico!", "sucesso");
+    if (atualizarRotinaAoFinalizar) {
+      const resultados = await Promise.all(
+        sessaoAtiva.exercicios.map((ex) =>
+          supabase
+            .from("workout_exercises")
+            .update({
+              sets: Number(ex.sets) || 1,
+              reps: ex.reps.trim() || "8-12",
+              load: ex.load.trim() || null,
+            })
+            .eq("id", ex.exerciseId)
+        )
+      );
+      if (resultados.some((r) => r.error)) {
+        // Sessão e histórico já estão salvos — só a atualização da rotina
+        // que falhou parcialmente, então avisamos sem travar o fluxo.
+        mostrarToast("Treino salvo, mas não deu pra atualizar a rotina com as cargas de hoje.");
+      }
+    }
+
+    mostrarToast(
+      atualizarRotinaAoFinalizar ? "Treino salvo e rotina atualizada!" : "Treino salvo no histórico!",
+      "sucesso"
+    );
     encerrarSessaoAtiva();
     setFinalizando(false);
     carregar();
@@ -616,10 +703,20 @@ function TreinosConteudo() {
           })}
         </ul>
 
+        <label className="mt-4 flex items-start gap-2 text-sm text-ink-muted">
+          <input
+            type="checkbox"
+            checked={atualizarRotinaAoFinalizar}
+            onChange={(e) => setAtualizarRotinaAoFinalizar(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-base-border accent-accent"
+          />
+          <span>Atualizar a rotina com as cargas/reps de hoje (vira o novo padrão)</span>
+        </label>
+
         <button
           onClick={finalizarTreino}
           disabled={finalizando}
-          className="mt-6 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="mt-3 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-base transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {finalizando ? "Salvando..." : "Finalizar treino"}
         </button>
@@ -699,20 +796,60 @@ function TreinosConteudo() {
                           Sem detalhe de exercícios salvo pra essa sessão.
                         </p>
                       ) : (
-                        <ul className="flex flex-col gap-1.5">
-                          {itens.map((item) => (
-                            <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
-                              <span className={item.completed ? "text-ink" : "text-ink-muted"}>
-                                {item.completed ? "✓ " : ""}
-                                {item.name}
-                              </span>
-                              <span className="shrink-0 text-xs text-ink-faint">
-                                {item.sets}x {item.reps}
-                                {item.load ? ` · ${item.load}` : ""}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        <>
+                          <ul className="flex flex-col gap-1.5">
+                            {itens.map((item) => (
+                              <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                                <span className={item.completed ? "text-ink" : "text-ink-muted"}>
+                                  {item.completed ? "✓ " : ""}
+                                  {item.name}
+                                </span>
+                                <span className="shrink-0 text-xs text-ink-faint">
+                                  {item.sets}x {item.reps}
+                                  {item.load ? ` · ${item.load}` : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {sessaoParaSalvarComoRotina === s.id ? (
+                            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-base-border pt-3">
+                              <input
+                                value={nomeNovaRotinaHistorico}
+                                onChange={(e) => setNomeNovaRotinaHistorico(e.target.value)}
+                                placeholder="Nome da nova rotina"
+                                autoFocus
+                                className="min-w-[160px] flex-1 rounded-md border border-base-border bg-base px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
+                              />
+                              <button
+                                onClick={() => criarRotinaAPartirDaSessao(s.id)}
+                                disabled={salvandoNovaRotina || !nomeNovaRotinaHistorico.trim()}
+                                className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-base disabled:opacity-50"
+                              >
+                                {salvandoNovaRotina ? "Criando..." : "Criar"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSessaoParaSalvarComoRotina(null);
+                                  setNomeNovaRotinaHistorico("");
+                                }}
+                                className="text-xs font-medium text-ink-faint hover:text-ink"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSessaoParaSalvarComoRotina(s.id);
+                                setNomeNovaRotinaHistorico(`${s.workout_name} (cópia)`);
+                              }}
+                              className="mt-3 text-xs font-medium text-accent hover:opacity-80"
+                            >
+                              + Salvar como nova rotina
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
