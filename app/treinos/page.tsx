@@ -87,18 +87,45 @@ function TreinosConteudo() {
   } | null>(null);
   const [finalizando, setFinalizando] = useState(false);
 
-  // Cronômetro ao vivo: recalcula o tempo decorrido a cada segundo
-  // enquanto houver uma sessão ativa.
+  // Cronômetro ao vivo, com suporte a pausa: enquanto pausado, o tempo
+  // acumulado até ali fica congelado (não conta banheiro/descanso longo
+  // no tempo total salvo no histórico). totalPausadoMs guarda a soma de
+  // todos os intervalos pausados na sessão atual.
   const [segundosDecorridos, setSegundosDecorridos] = useState(0);
+  const [pausado, setPausado] = useState(false);
+  const [pausaIniciadaEm, setPausaIniciadaEm] = useState<number | null>(null);
+  const [totalPausadoMs, setTotalPausadoMs] = useState(0);
+
   useEffect(() => {
-    if (!sessaoAtiva) return;
+    if (!sessaoAtiva || pausado) return;
     const inicio = new Date(sessaoAtiva.iniciadoEm).getTime();
-    setSegundosDecorridos(Math.max(0, Math.floor((Date.now() - inicio) / 1000)));
-    const intervalo = setInterval(() => {
-      setSegundosDecorridos(Math.max(0, Math.floor((Date.now() - inicio) / 1000)));
-    }, 1000);
+    const calcular = () => {
+      setSegundosDecorridos(Math.max(0, Math.floor((Date.now() - inicio - totalPausadoMs) / 1000)));
+    };
+    calcular();
+    const intervalo = setInterval(calcular, 1000);
     return () => clearInterval(intervalo);
-  }, [sessaoAtiva?.iniciadoEm]);
+  }, [sessaoAtiva?.iniciadoEm, pausado, totalPausadoMs]);
+
+  function alternarPausaTreino() {
+    if (pausado) {
+      // Retomando: soma quanto tempo ficou parado ao total pausado da sessão.
+      setTotalPausadoMs((atual) => atual + (pausaIniciadaEm !== null ? Date.now() - pausaIniciadaEm : 0));
+      setPausaIniciadaEm(null);
+      setPausado(false);
+    } else {
+      setPausaIniciadaEm(Date.now());
+      setPausado(true);
+    }
+  }
+
+  function encerrarSessaoAtiva() {
+    setSessaoAtiva(null);
+    setSegundosDecorridos(0);
+    setPausado(false);
+    setPausaIniciadaEm(null);
+    setTotalPausadoMs(0);
+  }
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -330,6 +357,10 @@ function TreinosConteudo() {
       })),
       iniciadoEm: new Date().toISOString(),
     });
+    setSegundosDecorridos(0);
+    setPausado(false);
+    setPausaIniciadaEm(null);
+    setTotalPausadoMs(0);
   }
 
   function atualizarExercicioSessao(
@@ -372,10 +403,10 @@ function TreinosConteudo() {
     }
 
     const finishedAt = new Date().toISOString();
-    const duracaoSegundos = Math.max(
-      0,
-      Math.floor((new Date(finishedAt).getTime() - new Date(sessaoAtiva.iniciadoEm).getTime()) / 1000)
-    );
+    // segundosDecorridos já desconta qualquer tempo pausado (e fica
+    // congelado corretamente se o usuário finalizar com o cronômetro
+    // ainda pausado), então é a fonte de verdade da duração real.
+    const duracaoSegundos = segundosDecorridos;
 
     const { data: sessaoSalva, error: erroSessao } = await supabase
       .from("workout_sessions")
@@ -419,7 +450,7 @@ function TreinosConteudo() {
     }
 
     mostrarToast("Treino salvo no histórico!", "sucesso");
-    setSessaoAtiva(null);
+    encerrarSessaoAtiva();
     setFinalizando(false);
     carregar();
   }
@@ -437,7 +468,7 @@ function TreinosConteudo() {
       <AppShell>
         <div className="mb-6">
           <button
-            onClick={() => setSessaoAtiva(null)}
+            onClick={encerrarSessaoAtiva}
             className="mb-3 text-sm text-ink-faint hover:text-ink"
           >
             ← Sair sem salvar
@@ -449,11 +480,32 @@ function TreinosConteudo() {
                 {feitos}/{total} exercícios concluídos
               </p>
             </div>
-            <div className="shrink-0 rounded-lg border border-base-border bg-base-surface px-3 py-1.5 text-center">
-              <p className="font-display text-lg font-bold tabular-nums text-accent">
-                {formatarCronometro(segundosDecorridos)}
-              </p>
-              <p className="text-[10px] text-ink-faint">tempo</p>
+            <div className="flex shrink-0 items-center gap-2">
+              <div
+                className={`rounded-lg border px-3 py-1.5 text-center ${
+                  pausado ? "border-warn/40 bg-warn-dim" : "border-base-border bg-base-surface"
+                }`}
+              >
+                <p
+                  className={`font-display text-lg font-bold tabular-nums ${
+                    pausado ? "text-warn" : "text-accent"
+                  }`}
+                >
+                  {formatarCronometro(segundosDecorridos)}
+                </p>
+                <p className="text-[10px] text-ink-faint">{pausado ? "pausado" : "tempo"}</p>
+              </div>
+              <button
+                onClick={alternarPausaTreino}
+                aria-label={pausado ? "Retomar treino" : "Pausar treino"}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-sm transition-colors ${
+                  pausado
+                    ? "border-accent bg-accent text-base"
+                    : "border-base-border text-ink-faint hover:border-accent hover:text-accent"
+                }`}
+              >
+                {pausado ? "▶" : "⏸"}
+              </button>
             </div>
           </div>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-base-border">
