@@ -1096,17 +1096,6 @@ function CardEstatistica({
   sublinha,
   sublinhaAlerta,
   destaque,
-}: {
-  label: string;
-  valor: string;
-  sublinha?: string;
-  sublinhaAlerta?: boolean;
-function CardEstatistica({
-  label,
-  valor,
-  sublinha,
-  sublinhaAlerta,
-  destaque,
   progresso,
 }: {
   label: string;
