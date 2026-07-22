@@ -594,6 +594,7 @@ export default function DashboardPage() {
                   : undefined
               }
               destaque={totalHoje > 0 && feitosHoje === totalHoje}
+              progresso={totalHoje > 0 ? (feitosHoje / totalHoje) * 100 : undefined}
             />
             <CardEstatistica
               label="Tarefas hoje"
@@ -1100,13 +1101,29 @@ function CardEstatistica({
   valor: string;
   sublinha?: string;
   sublinhaAlerta?: boolean;
+function CardEstatistica({
+  label,
+  valor,
+  sublinha,
+  sublinhaAlerta,
+  destaque,
+  progresso,
+}: {
+  label: string;
+  valor: string;
+  sublinha?: string;
+  sublinhaAlerta?: boolean;
   destaque?: boolean;
+  progresso?: number;
 }) {
+  const tamanhoValor =
+    valor.length > 9 ? "text-lg" : valor.length > 6 ? "text-xl" : "text-2xl";
+
   return (
-    <div className="rounded-xl border border-base-border bg-base-surface p-4">
+    <div className="min-w-0 rounded-xl border border-base-border bg-base-surface p-4">
       <p className="text-xs text-ink-muted">{label}</p>
       <p
-        className={`mt-1 font-display text-2xl font-bold ${
+        className={`mt-1 break-words font-display font-bold tabular-nums leading-tight ${tamanhoValor} ${
           destaque ? "text-accent" : "text-ink"
         }`}
       >
@@ -1114,12 +1131,20 @@ function CardEstatistica({
       </p>
       {sublinha && (
         <p
-          className={`mt-0.5 text-xs ${
+          className={`mt-0.5 truncate text-xs ${
             sublinhaAlerta ? "text-warn" : "text-ink-faint"
           }`}
         >
           {sublinha}
         </p>
+      )}
+      {typeof progresso === "number" && (
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-base">
+          <div
+            className="h-full rounded-full bg-accent"
+            style={{ width: `${Math.min(100, Math.max(0, progresso))}%` }}
+          />
+        </div>
       )}
     </div>
   );
