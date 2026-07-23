@@ -18,6 +18,7 @@ import type {
   WaterLog,
   Transaction,
   JournalEntry,
+  Goal,
 } from "@/types/database";
 
 const MSG_ERRO_CARREGAR =
@@ -64,6 +65,7 @@ export default function DashboardPage() {
   const [aguaHoje, setAguaHoje] = useState<WaterLog | null>(null);
   const [transacoes, setTransacoes] = useState<Transaction[]>([]);
   const [diarioMes, setDiarioMes] = useState<JournalEntry[]>([]);
+  const [metas, setMetas] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
 
   // "Relógio" leve só pra forçar recalcular data/mês em sessões longas
@@ -94,6 +96,7 @@ export default function DashboardPage() {
       { data: aguaData, error: erroAgua },
       { data: transacoesData, error: erroTransacoes },
       { data: diarioData, error: erroDiario },
+      { data: metasData, error: erroMetas },
     ] = await Promise.all([
       supabase.from("habits").select("*").eq("archived", false),
       supabase.from("habit_logs").select("*").eq("date", hoje),
@@ -113,6 +116,7 @@ export default function DashboardPage() {
         .from("journal_entries")
         .select("*")
         .gte("entry_date", inicioMes),
+      supabase.from("goals").select("*"),
     ]);
 
     if (erroHabits) houveErro = true;
@@ -123,6 +127,7 @@ export default function DashboardPage() {
     if (erroAgua) houveErro = true;
     if (erroTransacoes) houveErro = true;
     if (erroDiario) houveErro = true;
+    if (erroMetas) houveErro = true;
 
     if (houveErro) mostrarToast(MSG_ERRO_CARREGAR);
 
@@ -134,6 +139,7 @@ export default function DashboardPage() {
     setAguaHoje((aguaData as WaterLog) ?? null);
     setTransacoes((transacoesData as Transaction[]) ?? []);
     setDiarioMes((diarioData as JournalEntry[]) ?? []);
+    setMetas((metasData as Goal[]) ?? []);
     setLoading(false);
   }, [supabase, mostrarToast]);
 
@@ -191,27 +197,24 @@ export default function DashboardPage() {
   }, [logsHoje, habits, tarefas, hoje, sessoesSemana, treinosAtivos, aguaHoje]);
 
   const resumoRapido = useMemo(() => {
-    const saldo = transacoes.reduce(
-      (acc, t) => acc + (t.type === "income" ? t.amount : -t.amount),
-      0
-    );
     const receitaMes = transacoes
       .filter((t) => t.type === "income" && t.date.startsWith(mesAtual))
       .reduce((acc, t) => acc + t.amount, 0);
     const despesaMes = transacoes
       .filter((t) => t.type === "expense" && t.date.startsWith(mesAtual))
       .reduce((acc, t) => acc + t.amount, 0);
+    const guardado = metas.reduce((acc, g) => acc + (g.current_amount ?? 0), 0);
 
     return {
-      saldo,
       receitaMes,
       despesaMes,
+      guardado,
       aguaMl: aguaHoje?.ml ?? 0,
       aguaMetaMl: aguaHoje?.goal_ml ?? 2000,
       diasEscritos: new Set(diarioMes.map((j) => j.entry_date)).size,
       diasNoMes: diasNoMesAtual(),
     };
-  }, [transacoes, mesAtual, aguaHoje, diarioMes]);
+  }, [transacoes, mesAtual, aguaHoje, diarioMes, metas]);
 
   return (
     <AppShell>
