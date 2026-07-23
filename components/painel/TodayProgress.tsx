@@ -1,4 +1,3 @@
-import Link from "next/link";
 import ProgressRing from "./ProgressRing";
 import MetricRow from "./MetricRow";
 
@@ -40,11 +39,8 @@ export default function TodayProgress({ metricas }: { metricas: MetricasHoje }) 
 
   return (
     <section className="mb-5 rounded-2xl border border-base-border bg-base-surface p-5">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4">
         <h2 className="text-base font-semibold text-ink">Seu progresso hoje</h2>
-        <Link href="/habitos" className="text-xs font-medium text-accent hover:underline">
-          Ver tudo →
-        </Link>
       </div>
 
       <div className="flex items-center gap-5">
@@ -56,24 +52,28 @@ export default function TodayProgress({ metricas }: { metricas: MetricasHoje }) 
             label="Hábitos"
             fracaoTexto={`${habitosFeitos}/${habitosTotal}`}
             percentual={percentualSeguro(habitosFeitos, habitosTotal)}
+            href="/habitos"
           />
           <MetricRow
             icone={<IconeTarefa className="h-3.5 w-3.5" />}
             label="Tarefas"
             fracaoTexto={`${tarefasFeitas}/${tarefasTotal}`}
             percentual={percentualSeguro(tarefasFeitas, tarefasTotal)}
+            href="/tarefas"
           />
           <MetricRow
             icone={<IconeTreino className="h-3.5 w-3.5" />}
             label="Treinos"
             fracaoTexto={`${treinosFeitos}/${treinosMeta}`}
             percentual={percentualSeguro(treinosFeitos, treinosMeta)}
+            href="/treinos"
           />
           <MetricRow
             icone={<IconeAgua className="h-3.5 w-3.5" />}
             label="Água"
             fracaoTexto={`${aguaMl}/${aguaMetaMl}ml`}
             percentual={percentualSeguro(aguaMl, aguaMetaMl)}
+            href="/treinos?aba=dieta"
           />
         </div>
       </div>
